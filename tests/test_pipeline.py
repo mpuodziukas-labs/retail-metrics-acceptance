@@ -1,5 +1,6 @@
 import csv
 import json
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -738,6 +739,22 @@ def test_totals_too_large_to_add_are_refused_by_name_and_nothing_is_written(tmp_
     lines = [_line(InvoiceNo="D1", Quantity="9223372036854775807", UnitPrice="1.0"),
              _line(InvoiceNo="D2", Quantity="1", UnitPrice="1.0")]
     assert _entry(tmp_path, lines, capsys) == "the order totals are too large to add"
+
+
+def test_a_sqlite_error_that_is_not_an_overflow_comes_out_unchanged_and_nothing_is_written(
+        tmp_path, monkeypatch):
+    path, out = tmp_path / "u.csv", tmp_path / "m.json"
+    _write([_line()], path)
+
+    def broken(conn, checks):
+        raise sqlite3.OperationalError("no such table: orders")
+
+    monkeypatch.setattr(run, "compute_metrics", broken)
+    with pytest.raises(sqlite3.OperationalError) as caught:
+        run.main(["--csv", str(path), "--out", str(out), "--no-quality"])
+    assert type(caught.value) is sqlite3.OperationalError
+    assert str(caught.value) == "no such table: orders"
+    assert not out.exists()
 
 
 def test_a_metric_that_is_not_a_finite_number_is_refused_and_nothing_is_written(tmp_path, capsys):

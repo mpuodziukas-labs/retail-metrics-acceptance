@@ -18,3 +18,4 @@
 - test: pin loader header width, blank-cell counts, extra-column duplicates, required columns, BOM position and per-customer running total
 - fix: accept huge cells, refuse 64-bit overflow and Python-only numerals, count physical lines; pin month-1 retention denominator
 - fix: refuse overflowing totals and non-finite metrics by name; pin field-limit restore and .5 / 5. prices
+- test: pin that a non-overflow sqlite error reaches the caller unchanged

@@ -75,6 +75,7 @@ Each check is compared with `data/quality_baseline.json`, the count the vendored
 - Customers with NULL CustomerID (about a quarter of rows) are excluded from customer metrics (repeat rate, cohorts) and reported as an unattributed revenue share.
 - The final month in the sample (2011-12) is partial (data ends 2011-12-09); it is shown, and flagged in Limitations.
 - Derived SQL names are snake_case; raw columns keep source names.
+- Catching `sqlite3.Error` instead of `sqlite3.OperationalError` around the metrics step is an accepted equivalent, because SQLite reports integer overflow only as `OperationalError` and the message test still applies.
 - River alignment of keywords is not adopted; uppercase keywords and snake_case names are.
 - No hand-typed numbers in README or `docs/recommendation.md`: `make regen` writes them from `out/metrics.json`.
 - Every file read or written by `pipeline/` names `encoding="utf-8"`, so the outputs do not depend on the locale (`tests/test_entrypoints.py::test_run_script_output_is_identical_under_the_strictest_c_locale`, `tests/test_pipeline.py::test_every_text_io_call_in_pipeline_names_its_encoding`).
