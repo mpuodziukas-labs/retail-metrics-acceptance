@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Retail metrics dashboard</title>
+<style>:root{--bg:#fafaf8;--fg:#1c1c1a;--mut:#6b6b66;--acc:#1f5f8b;--card:#fff;--bd:#dcdcd6}
+@media (prefers-color-scheme:dark){:root{--bg:#161614;--fg:#ececE8;--mut:#a0a09a;--acc:#6bb0dc;--card:#1f1f1c;--bd:#33332f}}
+body{margin:0;padding:24px 16px;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
+main{max-width:860px;margin:0 auto}h1{font-size:22px}h2{font-size:16px;margin-top:32px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.tile{background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:12px}
+.tile b{display:block;font-size:20px;color:var(--acc)}.tile span.k{color:var(--mut);font-size:13px}
+svg{width:100%;height:auto}.bar{fill:var(--acc)}.ln{fill:none;stroke:var(--acc);stroke-width:2}
+.lbl{font-size:9px;fill:var(--mut)}table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border-bottom:1px solid var(--bd);padding:4px 6px;text-align:right}th:first-child,td:first-child{text-align:left}
+.wrap{overflow-x:auto}td span{color:var(--acc)}</style>
+</head>
+<body>
+<main>
+<h1>Retail metrics dashboard</h1>
+<p>Every figure on this page is read from out/metrics.json by the regen command.</p>
+<div class="tiles">
+<div class="tile"><span class="k">Revenue</span><b><span data-k="headline.revenue_total" data-f="money">267,859.98</span></b></div>
+<div class="tile"><span class="k">Orders</span><b><span data-k="headline.orders" data-f="int">7,635</span></b></div>
+<div class="tile"><span class="k">Average order value</span><b><span data-k="headline.aov" data-f="money">35.08</span></b></div>
+<div class="tile"><span class="k">Customers with an ID</span><b><span data-k="headline.customers" data-f="int">2,808</span></b></div>
+<div class="tile"><span class="k">Repeat-purchase rate</span><b><span data-k="headline.repeat_purchase_rate_pct" data-f="pct">48.72%</span></b></div>
+<div class="tile"><span class="k">Revenue from repeat customers</span><b><span data-k="headline.repeat_revenue_share_pct" data-f="pct">79.30%</span></b></div>
+<div class="tile"><span class="k">Cancellation rate</span><b><span data-k="headline.cancellation_rate_pct" data-f="pct">2.86%</span></b></div>
+<div class="tile"><span class="k">Retention one month on</span><b><span data-k="headline.month1_retention_pct" data-f="pct">13.24%</span></b></div>
+</div>
+<h2>Revenue by month</h2>
+<svg viewBox="0 0 720 250" role="img" aria-label="Monthly revenue">
+<rect x="14.0" y="98.6" width="45.8" height="91.4" class="bar" />
+<text data-k="monthly.0.revenue" data-f="money0" x="36.9" y="92.6" text-anchor="middle" class="lbl">22,131</text>
+<text data-k="monthly.0.month" data-f="str" x="36.9" y="206" text-anchor="middle" class="lbl">2010-12</text>
+<rect x="67.8" y="110.4" width="45.8" height="79.6" class="bar" />
+<text data-k="monthly.1.revenue" data-f="money0" x="90.8" y="104.4" text-anchor="middle" class="lbl">19,267</text>
+<text data-k="monthly.1.month" data-f="str" x="90.8" y="206" text-anchor="middle" class="lbl">2011-01</text>
+<rect x="121.7" y="140.1" width="45.8" height="49.9" class="bar" />
+<text data-k="monthly.2.revenue" data-f="money0" x="144.6" y="134.1" text-anchor="middle" class="lbl">12,089</text>
+<text data-k="monthly.2.month" data-f="str" x="144.6" y="206" text-anchor="middle" class="lbl">2011-02</text>
+<rect x="175.5" y="105.9" width="45.8" height="84.1" class="bar" />
+<text data-k="monthly.3.revenue" data-f="money0" x="198.5" y="99.9" text-anchor="middle" class="lbl">20,378</text>
+<text data-k="monthly.3.month" data-f="str" x="198.5" y="206" text-anchor="middle" class="lbl">2011-03</text>
+<rect x="229.4" y="124.5" width="45.8" height="65.5" class="bar" />
+<text data-k="monthly.4.revenue" data-f="money0" x="252.3" y="118.5" text-anchor="middle" class="lbl">15,869</text>
+<text data-k="monthly.4.month" data-f="str" x="252.3" y="206" text-anchor="middle" class="lbl">2011-04</text>
+<rect x="283.2" y="112.4" width="45.8" height="77.6" class="bar" />
+<text data-k="monthly.5.revenue" data-f="money0" x="306.2" y="106.4" text-anchor="middle" class="lbl">18,804</text>
+<text data-k="monthly.5.month" data-f="str" x="306.2" y="206" text-anchor="middle" class="lbl">2011-05</text>
+<rect x="337.1" y="114.3" width="45.8" height="75.7" class="bar" />
+<text data-k="monthly.6.revenue" data-f="money0" x="360.0" y="108.3" text-anchor="middle" class="lbl">18,323</text>
+<text data-k="monthly.6.month" data-f="str" x="360.0" y="206" text-anchor="middle" class="lbl">2011-06</text>
+<rect x="390.9" y="115.2" width="45.8" height="74.8" class="bar" />
+<text data-k="monthly.7.revenue" data-f="money0" x="413.8" y="109.2" text-anchor="middle" class="lbl">18,110</text>
+<text data-k="monthly.7.month" data-f="str" x="413.8" y="206" text-anchor="middle" class="lbl">2011-07</text>
+<rect x="444.8" y="106.3" width="45.8" height="83.7" class="bar" />
+<text data-k="monthly.8.revenue" data-f="money0" x="467.7" y="100.3" text-anchor="middle" class="lbl">20,265</text>
+<text data-k="monthly.8.month" data-f="str" x="467.7" y="206" text-anchor="middle" class="lbl">2011-08</text>
+<rect x="498.6" y="88.9" width="45.8" height="101.1" class="bar" />
+<text data-k="monthly.9.revenue" data-f="money0" x="521.5" y="82.9" text-anchor="middle" class="lbl">24,485</text>
+<text data-k="monthly.9.month" data-f="str" x="521.5" y="206" text-anchor="middle" class="lbl">2011-09</text>
+<rect x="552.5" y="61.9" width="45.8" height="128.1" class="bar" />
+<text data-k="monthly.10.revenue" data-f="money0" x="575.4" y="55.9" text-anchor="middle" class="lbl">31,028</text>
+<text data-k="monthly.10.month" data-f="str" x="575.4" y="206" text-anchor="middle" class="lbl">2011-10</text>
+<rect x="606.3" y="40.0" width="45.8" height="150.0" class="bar" />
+<text data-k="monthly.11.revenue" data-f="money0" x="629.2" y="34.0" text-anchor="middle" class="lbl">36,327</text>
+<text data-k="monthly.11.month" data-f="str" x="629.2" y="206" text-anchor="middle" class="lbl">2011-11</text>
+<rect x="660.2" y="145.5" width="45.8" height="44.5" class="bar" />
+<text data-k="monthly.12.revenue" data-f="money0" x="683.1" y="139.5" text-anchor="middle" class="lbl">10,785</text>
+<text data-k="monthly.12.month" data-f="str" x="683.1" y="206" text-anchor="middle" class="lbl">2011-12</text>
+</svg>
+<h2>Running revenue total</h2>
+<svg viewBox="0 0 720 230" role="img" aria-label="Running revenue total">
+<polyline points="10.0,177.6 68.3,166.8 126.7,160.0 185.0,148.6 243.3,139.7 301.7,129.2 360.0,119.0 418.3,108.8 476.7,97.5 535.0,83.8 593.3,66.4 651.7,46.0 710.0,40.0" class="ln" />
+<text data-k="monthly.12.running_total" data-f="money0" x="710" y="30" text-anchor="end" class="lbl">267,860</text>
+</svg>
+<h2>Cohort retention by months since first order</h2>
+<div class="wrap">
+<table><thead><tr><th>Cohort (size)</th><th><span data-k="cohorts.0.month_index" data-f="int">0</span></th><th><span data-k="cohorts.1.month_index" data-f="int">1</span></th><th><span data-k="cohorts.2.month_index" data-f="int">2</span></th><th><span data-k="cohorts.3.month_index" data-f="int">3</span></th><th><span data-k="cohorts.4.month_index" data-f="int">4</span></th><th><span data-k="cohorts.5.month_index" data-f="int">5</span></th><th><span data-k="cohorts.6.month_index" data-f="int">6</span></th><th><span data-k="cohorts.7.month_index" data-f="int">7</span></th><th><span data-k="cohorts.8.month_index" data-f="int">8</span></th><th><span data-k="cohorts.9.month_index" data-f="int">9</span></th><th><span data-k="cohorts.10.month_index" data-f="int">10</span></th><th><span data-k="cohorts.11.month_index" data-f="int">11</span></th><th><span data-k="cohorts.12.month_index" data-f="int">12</span></th></tr></thead><tbody>
+<tr><th><span data-k="cohorts.0.cohort_month" data-f="str">2010-12</span> (<span data-k="cohorts.0.cohort_size" data-f="int">397</span>)</th><td><span data-k="cohorts.0.retention_pct" data-f="pct" style="opacity:1.00">100.00%</span></td><td><span data-k="cohorts.1.retention_pct" data-f="pct" style="opacity:0.41">21.66%</span></td><td><span data-k="cohorts.2.retention_pct" data-f="pct" style="opacity:0.39">18.89%</span></td><td><span data-k="cohorts.3.retention_pct" data-f="pct" style="opacity:0.41">21.41%</span></td><td><span data-k="cohorts.4.retention_pct" data-f="pct" style="opacity:0.38">17.88%</span></td><td><span data-k="cohorts.5.retention_pct" data-f="pct" style="opacity:0.41">21.66%</span></td><td><span data-k="cohorts.6.retention_pct" data-f="pct" style="opacity:0.41">20.91%</span></td><td><span data-k="cohorts.7.retention_pct" data-f="pct" style="opacity:0.40">20.15%</span></td><td><span data-k="cohorts.8.retention_pct" data-f="pct" style="opacity:0.39">18.14%</span></td><td><span data-k="cohorts.9.retention_pct" data-f="pct" style="opacity:0.42">22.42%</span></td><td><span data-k="cohorts.10.retention_pct" data-f="pct" style="opacity:0.41">21.41%</span></td><td><span data-k="cohorts.11.retention_pct" data-f="pct" style="opacity:0.49">31.49%</span></td><td><span data-k="cohorts.12.retention_pct" data-f="pct" style="opacity:0.38">16.88%</span></td></tr>
+<tr><th><span data-k="cohorts.13.cohort_month" data-f="str">2011-01</span> (<span data-k="cohorts.13.cohort_size" data-f="int">250</span>)</th><td><span data-k="cohorts.13.retention_pct" data-f="pct" style="opacity:1.00">100.00%</span></td><td><span data-k="cohorts.14.retention_pct" data-f="pct" style="opacity:0.35">12.80%</span></td><td><span data-k="cohorts.15.retention_pct" data-f="pct" style="opacity:0.40">20.00%</span></td><td><span data-k="cohorts.16.retention_pct" data-f="pct" style="opacity:0.38">17.60%</span></td><td><span data-k="cohorts.17.retention_pct" data-f="pct" style="opacity:0.42">23.20%</span></td><td><span data-k="cohorts.18.retention_pct" data-f="pct" style="opacity:0.40">20.00%</span></td><td><span data-k="cohorts.19.retention_pct" data-f="pct" style="opacity:0.37">16.40%</span></td><td><span data-k="cohorts.20.retention_pct" data-f="pct" style="opacity:0.40">19.60%</span></td><td><span data-k="cohorts.21.retention_pct" data-f="pct" style="opacity:0.42">22.80%</span></td><td><span data-k="cohorts.22.retention_pct" data-f="pct" style="opacity:0.43">24.00%</span></td><td><span data-k="cohorts.23.retention_pct" data-f="pct" style="opacity:0.46">28.40%</span></td><td><span data-k="cohorts.24.retention_pct" data-f="pct" style="opacity:0.32">9.20%</span></td></tr>
+<tr><th><span data-k="cohorts.25.cohort_month" data-f="str">2011-02</span> (<span data-k="cohorts.25.cohort_size" data-f="int">205</span>)</th><td><span data-k="cohorts.25.retention_pct" data-f="pct" style="opacity:1.00">100.00%</span></td><td><span data-k="cohorts.26.retention_pct" data-f="pct" style="opacity:0.37">16.10%</span></td><td><span data-k="cohorts.27.retention_pct" data-f="pct" style="opacity:0.36">15.12%</span></td><td><span data-k="cohorts.28.retention_pct" data-f="pct" style="opacity:0.40">20.49%</span></td><td><span data-k="cohorts.29.retention_pct" data-f="pct" style="opacity:0.37">15.61%</span></td><td><span data-k="cohorts.30.retention_pct" data-f="pct" style="opacity:0.38">17.56%</span></td><td><span data-k="cohorts.31.retention_pct" data-f="pct" style="opacity:0.36">14.15%</span></td><td><span data-k="cohorts.32.retention_pct" data-f="pct" style="opacity:0.40">20.00%</span></td><td><span data-k="cohorts.33.retention_pct" data-f="pct" style="opacity:0.41">21.46%</span></td><td><span data-k="cohorts.34.retention_pct" data-f="pct" style="opacity:0.43">23.41%</span></td><td><span data-k="cohorts.35.retention_pct" data-f="pct" style="opacity:0.30">6.34%</span></td></tr>
+<tr><th><span data-k="cohorts.36.cohort_month" data-f="str">2011-03</span> (<span data-k="cohorts.36.cohort_size" data-f="int">275</span>)</th><td><span data-k="cohorts.36.retention_pct" data-f="pct" style="opacity:1.00">100.00%</span></td><td><span data-k="cohorts.37.retention_pct" data-f="pct" style="opacity:0.32">9.09%</span></td><td><span data-k="cohorts.38.retention_pct" data-f="pct" style="opacity:0.33">11.27%</span></td><td><span data-k="cohorts.39.retention_pct" data-f="pct" style="opacity:0.35">13.09%</span></td><td><span data-k="cohorts.40.retention_pct" data-f="pct" style="opacity:0.35">13.09%</span></td><td><span data-k="cohorts.41.retention_pct" data-f="pct" style="opacity:0.34">12.00%</span></td><td><span data-k="cohorts.42.retention_pct" data-f="pct" style="opacity:0.37">16.00%</span></td><td><span data-k="cohorts.43.retention_pct" data-f="pct" style="opacity:0.38">17.09%</span></td><td><span data-k="cohorts.44.retention_pct" data-f="pct" style="opacity:0.40">19.64%</span></td><td><span data-k="cohorts.45.retention_pct" data-f="pct" style="opacity:0.29">5.09%</span></td></tr>
+<tr><th><span data-k="cohorts.46.cohort_month" data-f="str">2011-04</span> (<span data-k="cohorts.46.cohort_size" data-f="int">193</span>)</th><td><span data-k="cohorts.46.retention_pct" data-f="pct" style="opacity:1.00">100.00%</span></td><td><span data-k="cohorts.47.retention_pct" data-f="pct" style="opacity:0.36">14.51%</span></td><td><span data-k="cohorts.48.retention_pct" data-f="pct" style="opacity:0.35">13.99%</span></td><td><span data-k="cohorts.49.retention_pct" data-f="pct" style="opacity:0.31">7.77%</span></td><td><span data-k="cohorts.50.retention_pct" data-f="pct" style="opacity:0.33">10.36%</span></td><td><span data-k="cohorts.51.retention_pct" data-f="pct" style="opacity:0.35">13.47%</span></td><td><span data-k="cohorts.52.retention_pct" data-f="pct" style="opacity:0.39">18.13%</span></td><td><span data-k="cohorts.53.retention_pct" data-f="pct" style="opacity:0.39">18.65%</span></td><td><span data-k="cohorts.54.retention_pct" data-f="pct" style="opacity:0.28">4.66%</span></td></tr>
+<tr><th><span data-k="cohorts.55.cohort_month" data-f="str">2011-05</span> (<span data-k="cohorts.55.cohort_size" data-f="int">208</span>)</th><td><span data-k="cohorts.55.retention_pct" data-f="pct" style="opacity:1.00">100.00%</span></td><td><span data-k="cohorts.56.retention_pct" data-f="pct" style="opacity:0.33">10.10%</span></td><td><span data-k="cohorts.57.retention_pct" data-f="pct" style="opacity:0.36">14.42%</span></td><td><span data-k="cohorts.58.retention_pct" data-f="pct" style="opacity:0.34">11.54%</span></td><td><span data-k="cohorts.59.retention_pct" data-f="pct" style="opacity:0.38">17.31%</span></td><td><span data-k="cohorts.60.retention_pct" data-f="pct" style="opacity:0.37">15.87%</span></td><td><span data-k="cohorts.61.retention_pct" data-f="pct" style="opacity:0.39">18.75%</span></td><td><span data-k="cohorts.62.retention_pct" data-f="pct" style="opacity:0.29">4.81%</span></td></tr>
+<tr><th><span data-k="cohorts.63.cohort_month" data-f="str">2011-06</span> (<span data-k="cohorts.63.cohort_size" data-f="int">165</span>)</th><td><span data-k="cohorts.63.retention_pct" data-f="pct" style="opacity:1.00">100.00%</span></td><td><span data-k="cohorts.64.retention_pct" data-f="pct" style="opacity:0.35">13.94%</span></td><td><span data-k="cohorts.65.retention_pct" data-f="pct" style="opacity:0.35">13.33%</span></td><td><span data-k="cohorts.66.retention_pct" data-f="pct" style="opacity:0.40">19.39%</span></td><td><span data-k="cohorts.67.retention_pct" data-f="pct" style="opacity:0.41">21.82%</span></td><td><span data-k="cohorts.68.retention_pct" data-f="pct" style="opacity:0.42">22.42%</span></td><td><span data-k="cohorts.69.retention_pct" data-f="pct" style="opacity:0.30">6.06%</span></td></tr>
+<tr><th><span data-k="cohorts.70.cohort_month" data-f="str">2011-07</span> (<span data-k="cohorts.70.cohort_size" data-f="int">141</span>)</th><td><span data-k="cohorts.70.retention_pct" data-f="pct" style="opacity:1.00">100.00%</span></td><td><span data-k="cohorts.71.retention_pct" data-f="pct" style="opacity:0.28">3.55%</span></td><td><span data-k="cohorts.72.retention_pct" data-f="pct" style="opacity:0.36">14.89%</span></td><td><span data-k="cohorts.73.retention_pct" data-f="pct" style="opacity:0.35">12.77%</span></td><td><span data-k="cohorts.74.retention_pct" data-f="pct" style="opacity:0.36">14.18%</span></td><td><span data-k="cohorts.75.retention_pct" data-f="pct" style="opacity:0.31">8.51%</span></td></tr>
+<tr><th><span data-k="cohorts.76.cohort_month" data-f="str">2011-08</span> (<span data-k="cohorts.76.cohort_size" data-f="int">145</span>)</th><td><span data-k="cohorts.76.retention_pct" data-f="pct" style="opacity:1.00">100.00%</span></td><td><span data-k="cohorts.77.retention_pct" data-f="pct" style="opacity:0.33">10.34%</span></td><td><span data-k="cohorts.78.retention_pct" data-f="pct" style="opacity:0.33">10.34%</span></td><td><span data-k="cohorts.79.retention_pct" data-f="pct" style="opacity:0.36">15.17%</span></td><td><span data-k="cohorts.80.retention_pct" data-f="pct" style="opacity:0.30">6.90%</span></td></tr>
+<tr><th><span data-k="cohorts.81.cohort_month" data-f="str">2011-09</span> (<span data-k="cohorts.81.cohort_size" data-f="int">219</span>)</th><td><span data-k="cohorts.81.retention_pct" data-f="pct" style="opacity:1.00">100.00%</span></td><td><span data-k="cohorts.82.retention_pct" data-f="pct" style="opacity:0.34">11.87%</span></td><td><span data-k="cohorts.83.retention_pct" data-f="pct" style="opacity:0.42">22.37%</span></td><td><span data-k="cohorts.84.retention_pct" data-f="pct" style="opacity:0.29">5.02%</span></td></tr>
+<tr><th><span data-k="cohorts.85.cohort_month" data-f="str">2011-10</span> (<span data-k="cohorts.85.cohort_size" data-f="int">264</span>)</th><td><span data-k="cohorts.85.retention_pct" data-f="pct" style="opacity:1.00">100.00%</span></td><td><span data-k="cohorts.86.retention_pct" data-f="pct" style="opacity:0.39">18.94%</span></td><td><span data-k="cohorts.87.retention_pct" data-f="pct" style="opacity:0.30">7.20%</span></td></tr>
+<tr><th><span data-k="cohorts.88.cohort_month" data-f="str">2011-11</span> (<span data-k="cohorts.88.cohort_size" data-f="int">287</span>)</th><td><span data-k="cohorts.88.retention_pct" data-f="pct" style="opacity:1.00">100.00%</span></td><td><span data-k="cohorts.89.retention_pct" data-f="pct" style="opacity:0.30">6.97%</span></td></tr>
+<tr><th><span data-k="cohorts.90.cohort_month" data-f="str">2011-12</span> (<span data-k="cohorts.90.cohort_size" data-f="int">59</span>)</th><td><span data-k="cohorts.90.retention_pct" data-f="pct" style="opacity:1.00">100.00%</span></td></tr>
+</tbody></table>
+</div>
+<h2>Top three products in the three largest countries</h2>
+<div class="wrap">
+<table><thead><tr><th>Country</th><th>Rank</th><th>Stock code</th><th>Product</th><th>Revenue</th></tr></thead><tbody>
+<tr><td><span data-k="top_products.0.country" data-f="str">United Kingdom</span></td><td><span data-k="top_products.0.rank" data-f="int">1</span></td><td><span data-k="top_products.0.stock_code" data-f="str">21175</span></td><td><span data-k="top_products.0.description" data-f="str">GIN + TONIC DIET METAL SIGN</span></td><td><span data-k="top_products.0.revenue" data-f="money">3,907.59</span></td></tr>
+<tr><td><span data-k="top_products.1.country" data-f="str">United Kingdom</span></td><td><span data-k="top_products.1.rank" data-f="int">2</span></td><td><span data-k="top_products.1.stock_code" data-f="str">85099B</span></td><td><span data-k="top_products.1.description" data-f="str">JUMBO BAG RED RETROSPOT</span></td><td><span data-k="top_products.1.revenue" data-f="money">3,775.35</span></td></tr>
+<tr><td><span data-k="top_products.2.country" data-f="str">United Kingdom</span></td><td><span data-k="top_products.2.rank" data-f="int">3</span></td><td><span data-k="top_products.2.stock_code" data-f="str">21733</span></td><td><span data-k="top_products.2.description" data-f="str">RED HANGING HEART T-LIGHT HOLDER</span></td><td><span data-k="top_products.2.revenue" data-f="money">3,235.75</span></td></tr>
+<tr><td><span data-k="top_products.3.country" data-f="str">EIRE</span></td><td><span data-k="top_products.3.rank" data-f="int">1</span></td><td><span data-k="top_products.3.stock_code" data-f="str">22967</span></td><td><span data-k="top_products.3.description" data-f="str">SET 3 SONG BIRD PAPER EGGS ASSORTED</span></td><td><span data-k="top_products.3.revenue" data-f="money">629.70</span></td></tr>
+<tr><td><span data-k="top_products.4.country" data-f="str">EIRE</span></td><td><span data-k="top_products.4.rank" data-f="int">2</span></td><td><span data-k="top_products.4.stock_code" data-f="str">23174</span></td><td><span data-k="top_products.4.description" data-f="str">REGENCY SUGAR BOWL GREEN</span></td><td><span data-k="top_products.4.revenue" data-f="money">395.80</span></td></tr>
+<tr><td><span data-k="top_products.5.country" data-f="str">EIRE</span></td><td><span data-k="top_products.5.rank" data-f="int">3</span></td><td><span data-k="top_products.5.stock_code" data-f="str">22483</span></td><td><span data-k="top_products.5.description" data-f="str">RED GINGHAM TEDDY BEAR </span></td><td><span data-k="top_products.5.revenue" data-f="money">367.20</span></td></tr>
+<tr><td><span data-k="top_products.6.country" data-f="str">Netherlands</span></td><td><span data-k="top_products.6.rank" data-f="int">1</span></td><td><span data-k="top_products.6.stock_code" data-f="str">21212</span></td><td><span data-k="top_products.6.description" data-f="str">PACK OF 72 RETROSPOT CAKE CASES</span></td><td><span data-k="top_products.6.revenue" data-f="money">604.80</span></td></tr>
+<tr><td><span data-k="top_products.7.country" data-f="str">Netherlands</span></td><td><span data-k="top_products.7.rank" data-f="int">2</span></td><td><span data-k="top_products.7.stock_code" data-f="str">22629</span></td><td><span data-k="top_products.7.description" data-f="str">SPACEBOY LUNCH BOX </span></td><td><span data-k="top_products.7.revenue" data-f="money">528.00</span></td></tr>
+<tr><td><span data-k="top_products.8.country" data-f="str">Netherlands</span></td><td><span data-k="top_products.8.rank" data-f="int">3</span></td><td><span data-k="top_products.8.stock_code" data-f="str">21559</span></td><td><span data-k="top_products.8.description" data-f="str">STRAWBERRY LUNCH BOX WITH CUTLERY</span></td><td><span data-k="top_products.8.revenue" data-f="money">378.00</span></td></tr>
+</tbody></table>
+</div>
+</main>
+</body>
+</html>
