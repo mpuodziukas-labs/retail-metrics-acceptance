@@ -74,16 +74,33 @@ def test_runbook_sections_present():
         assert h in text
 
 
-def test_trace_table_proven_rows_have_existing_tests():
-    rows = [l for l in (ROOT / "SPEC.md").read_text().splitlines()
+def _trace_rows():
+    return [l for l in (ROOT / "SPEC.md").read_text().splitlines()
             if l.startswith("|") and l.rstrip().endswith(("PROVEN |", "GAP |"))]
+
+
+def _sort_key(line):
+    nums = [int(n) for n in re.findall(r"(\d+)/10", line)]
+    assert len(nums) == 3, line
+    return (max(nums), sum(nums))
+
+
+def test_trace_table_proven_rows_have_existing_tests():
+    rows = _trace_rows()
     proven = [l for l in rows if l.rstrip().endswith("PROVEN |")]
     gaps = [l for l in rows if l.rstrip().endswith("GAP |")]
-    assert len(proven) == 8 and len(gaps) == 4
+    assert len(proven) == 12 and len(gaps) == 5
+    assert rows == proven + gaps, "PROVEN rows must come first"
     for l in proven:
         _assert_ids_exist(l)
     for l in gaps:
         assert not TEST_ID.search(l)
+
+
+def test_trace_table_ordered_by_highest_count():
+    for group in ("PROVEN |", "GAP |"):
+        keys = [_sort_key(l) for l in _trace_rows() if l.rstrip().endswith(group)]
+        assert keys == sorted(keys, reverse=True), keys
 
 
 def test_no_em_dash_in_repo_files():

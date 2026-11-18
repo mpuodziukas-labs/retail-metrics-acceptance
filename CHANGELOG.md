@@ -5,3 +5,4 @@
 - feat: add SQL metrics layer, loader and quality gate
 - feat: add renderers, regen, dashboard, docs, CI and generated outputs
 - docs: add run receipts
+- docs: redraw trace table counts and add requirement rows
