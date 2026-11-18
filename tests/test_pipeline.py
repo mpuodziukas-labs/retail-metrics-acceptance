@@ -2,6 +2,8 @@ import csv
 import json
 from pathlib import Path
 
+import pytest
+
 from pipeline import run, selftest
 
 
@@ -127,3 +129,69 @@ def test_selftest_fails_when_clean_control_goes_red(monkeypatch, capsys):
     assert selftest.main() == 1
     assert "stays green: NO" in capsys.readouterr().out
 
+
+def _line(**kw):
+    line = {"InvoiceNo": "D1", "StockCode": "S1", "Description": "x", "Quantity": "2",
+            "InvoiceDate": "2011-01-05 10:00:00", "UnitPrice": "2.0",
+            "CustomerID": "c1", "Country": "France"}
+    line.update(kw)
+    return line
+
+
+def _checks(tmp_path, lines):
+    _write(lines, tmp_path / "q.csv")
+    conn = run.build_db(tmp_path / "q.csv")
+    return {c["name"]: c for c in run.run_quality(conn, run.load_baseline())}
+
+
+def test_lines_differing_only_in_price_are_not_duplicates(tmp_path):
+    lines = [_line(), _line(UnitPrice="3.0"), _line()]
+    assert _checks(tmp_path, lines)["duplicate_order_lines"]["observed"] == 1
+
+
+def test_null_key_ignores_a_non_sale_line(tmp_path):
+    check = _checks(tmp_path, [_line(StockCode="", Quantity="-1", UnitPrice="3.5")])["null_join_key"]
+    assert check["observed"] == 0 and check["ok"]
+
+
+def test_main_creates_missing_output_folders(tmp_path):
+    out = tmp_path / "a" / "b" / "m.json"
+    assert run.main(["--csv", str(run.CSV), "--out", str(out)]) == 0
+    assert out.exists()
+
+
+def _stub_run(monkeypatch, fault_codes, write_on_fault=False):
+    calls = []
+
+    def fake(argv):
+        if argv[argv.index("--csv") + 1] == str(run.CSV):
+            return 0
+        calls.append(argv)
+        if write_on_fault:
+            Path(argv[argv.index("--out") + 1]).write_text("{}")
+        return fault_codes[len(calls) - 1]
+    monkeypatch.setattr(run, "main", fake)
+
+
+@pytest.mark.parametrize("codes", [(0, 1), (1, 0)])
+def test_selftest_fails_when_only_one_fault_is_missed(monkeypatch, capsys, codes):
+    _stub_run(monkeypatch, codes)
+    assert selftest.main() == 1
+    out = capsys.readouterr().out
+    assert "MISSED" in out and "CAUGHT" in out and out.endswith("SELFTEST FAIL\n")
+
+
+def test_selftest_counts_red_exit_that_wrote_metrics_as_missed(monkeypatch, capsys):
+    _stub_run(monkeypatch, (1, 1), write_on_fault=True)
+    assert selftest.main() == 1
+    out = capsys.readouterr().out
+    assert out.count("MISSED") == 2 and "SELFTEST FAIL" in out
+
+
+def test_plant_null_key_skips_guest_lines(tmp_path):
+    src, dst = tmp_path / "s.csv", tmp_path / "d.csv"
+    _write([_line(InvoiceNo="G1", CustomerID=""), _line(InvoiceNo="K1")], src)
+    selftest.plant_null_key(src, dst)
+    with open(dst, newline="") as fh:
+        got = {r["InvoiceNo"]: r["StockCode"] for r in csv.DictReader(fh)}
+    assert got == {"G1": "S1", "K1": ""}

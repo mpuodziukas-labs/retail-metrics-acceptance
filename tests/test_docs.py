@@ -212,3 +212,27 @@ def test_results_block_counts_only_passing_quality_checks():
     m["quality"][0] = dict(m["quality"][0], ok=False)
     assert "| Quality checks passing | 3/4 |" in render.results_block(m)
 
+
+def test_results_block_total_follows_number_of_checks():
+    m = _metrics()
+    m["quality"] = m["quality"][:3]
+    assert "| Quality checks passing | 3/3 |" in render.results_block(m)
+
+
+def _regen_without(tmp_path, monkeypatch, missing):
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "README.md").write_text((ROOT / "README.md").read_text())
+    for d in {"out", "dashboard"} - {missing}:
+        (tmp_path / d).mkdir()
+    monkeypatch.setattr(regen, "ROOT", tmp_path)
+    assert regen.main() == 0
+
+
+def test_regen_creates_missing_out_folder(tmp_path, monkeypatch):
+    _regen_without(tmp_path, monkeypatch, "out")
+    assert (tmp_path / "out/metrics.json").is_file()
+
+
+def test_regen_creates_missing_dashboard_folder(tmp_path, monkeypatch):
+    _regen_without(tmp_path, monkeypatch, "dashboard")
+    assert (tmp_path / "dashboard/index.html").is_file()

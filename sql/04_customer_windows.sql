@@ -1,5 +1,6 @@
 -- customer_order_windows: per-customer order sequencing and cumulative
--- spend, computed over clean_orders. Feeds the repeat-purchase and cohort metrics.
+-- spend, computed over clean_orders. A per-customer sequencing view exposed
+-- for analysis and covered by tests; no other view or pipeline step reads it.
 -- Window function #3: ROW_NUMBER() for order sequence.
 -- Window function #4: SUM() OVER a running frame for cumulative revenue.
 DROP VIEW IF EXISTS customer_order_windows;

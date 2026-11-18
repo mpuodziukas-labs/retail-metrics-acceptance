@@ -103,3 +103,111 @@ def test_monthly_cancellation_counts_invoices_not_lines(tiny):
     got = q(tiny, "SELECT invoices, cancelled_invoices, cancellation_rate_pct "
                   "FROM monthly_cancellation WHERE month = '2011-03'")
     assert got == [(4, 1, 25.0)]
+
+
+def _row(inv, stock, desc, qty, date, price, cust, country):
+    return [inv, stock, desc, qty, date, price, cust, country]
+
+
+def test_dim_products_has_no_row_for_null_stock_code(tmp_path_factory):
+    db = _build(tmp_path_factory, "nokey", [
+        _row("N1", "", "Ghost", 1, "2011-01-05 10:00:00", 3.0, "c1", "France"),
+        _row("N2", "S1", "Alpha", 1, "2011-01-06 10:00:00", 3.0, "c1", "France")])
+    assert q(db, "SELECT StockCode, canonical_description FROM dim_products") == [("S1", "Alpha")]
+
+
+@pytest.mark.parametrize("descs", [("Zed", "Alpha"), ("Alpha", "Zed")])
+def test_dim_products_picks_alphabetically_first_description(tmp_path_factory, descs):
+    db = _build(tmp_path_factory, "desc", [
+        _row(f"D{i}", "S1", d, 1, "2011-01-05 10:00:00", 2.0, "c1", "France")
+        for i, d in enumerate(descs)])
+    assert q(db, "SELECT StockCode, canonical_description FROM dim_products") == [("S1", "Alpha")]
+
+
+@pytest.fixture
+def c_inside(tmp_path_factory):
+    # A5C1 has a C that is not its first character; C7 is a real cancellation prefix.
+    return _build(tmp_path_factory, "cinside", [
+        _row("A5C1", "S1", "Alpha", 1, "2011-05-01 10:00:00", 5.0, "c1", "France"),
+        _row("C7", "S1", "Alpha", 1, "2011-05-02 10:00:00", 5.0, "c1", "France")])
+
+
+def test_c_not_first_character_is_not_a_cancellation_flag(c_inside):
+    got = q(c_inside, "SELECT InvoiceNo, is_cancellation FROM clean_orders ORDER BY InvoiceNo")
+    assert got == [("A5C1", 0), ("C7", 1)]
+
+
+def test_c_not_first_character_is_not_a_cancelled_invoice_in_monthly_rate(c_inside):
+    got = q(c_inside, "SELECT invoices, cancelled_invoices, cancellation_rate_pct "
+                      "FROM monthly_cancellation")
+    assert got == [(2, 1, 50.0)]
+
+
+def test_customer_windows_has_no_guest_rows(tiny):
+    # tiny has 5 clean lines with a customer id and 3 clean guest lines.
+    assert q(tiny, "SELECT COUNT(*), COUNT(CustomerID) FROM customer_order_windows") == [(5, 5)]
+
+
+def _same_date(tmp_path_factory, order):
+    inv = {"X1": 3.0, "X2": 2.0}  # one unit each; revenue 3 and 2
+    return _build(tmp_path_factory, "samedate", [
+        _row(n, "S2" if n == "X1" else "S1", "Alpha", 1, "2011-06-01 10:00:00", inv[n], "c1", "France")
+        for n in order])
+
+
+@pytest.mark.parametrize("order", [("X2", "X1"), ("X1", "X2")])
+def test_order_seq_breaks_date_ties_by_invoice_number(tmp_path_factory, order):
+    db = _same_date(tmp_path_factory, order)
+    got = q(db, "SELECT InvoiceNo, order_seq FROM customer_order_windows ORDER BY order_seq")
+    assert got == [("X1", 1), ("X2", 2)]
+
+
+@pytest.mark.parametrize("order", [("X2", "X1"), ("X1", "X2")])
+def test_running_revenue_breaks_date_ties_by_invoice_number(tmp_path_factory, order):
+    db = _same_date(tmp_path_factory, order)
+    got = q(db, "SELECT InvoiceNo, running_customer_revenue FROM customer_order_windows "
+                "ORDER BY running_customer_revenue")
+    assert got == [("X1", 3.0), ("X2", 5.0)]
+
+
+def test_guest_revenue_is_zero_not_null_when_every_line_has_a_customer(reversed_numbers):
+    assert q(reversed_numbers, "SELECT guest_revenue_share_pct FROM headline_metrics") == [(0.0,)]
+
+
+def test_repeat_customers_is_zero_not_null_without_identified_customers(tmp_path_factory):
+    db = _build(tmp_path_factory, "guestonly", [
+        _row("G1", "S1", "Alpha", 1, "2011-06-01 10:00:00", 4.0, "", "Italy")])
+    assert q(db, "SELECT customers, repeat_customers FROM headline_metrics") == [(0, 0)]
+
+
+def test_repeat_customers_is_zero_when_nobody_ordered_twice(tmp_path_factory):
+    db = _build(tmp_path_factory, "once", [
+        _row("O1", "S1", "Alpha", 1, "2011-06-01 10:00:00", 4.0, "c1", "France")])
+    assert q(db, "SELECT customers, repeat_customers FROM headline_metrics") == [(1, 0)]
+
+
+@pytest.mark.parametrize("order", [("Spain", "France"), ("France", "Spain")])
+def test_primary_country_ties_break_by_invoice_number_then_country(tmp_path_factory, order):
+    # c1: same earliest date, invoices A1 (Spain) and A2 (France) -> lowest invoice, Spain.
+    # c2: same date and invoice, Spain and France -> alphabetically first country, France.
+    rows = []
+    for country in order:
+        inv = "A1" if country == "Spain" else "A2"
+        rows.append(_row(inv, "S1", "Alpha", 1, "2011-07-01 10:00:00", 1.0, "c1", country))
+        rows.append(_row("B1", "S1", "Alpha", 1, "2011-07-01 10:00:00", 1.0, "c2", country))
+    db = _build(tmp_path_factory, "tie", rows)
+    got = q(db, "SELECT CustomerID, primary_country FROM dim_customers ORDER BY CustomerID")
+    assert got == [("c1", "Spain"), ("c2", "France")]
+
+
+def test_guest_only_data_renders_with_zero_rates(tmp_path_factory):
+    from pipeline import render
+    db = _build(tmp_path_factory, "guestrender", [
+        _row("G1", "S1", "Alpha", 1, "2011-06-01 10:00:00", 4.0, "", "Italy")])
+    m = run.compute_metrics(db, run.run_quality(db, run.load_baseline()))
+    assert m["headline"]["repeat_purchase_rate_pct"] == 0
+    assert m["headline"]["repeat_revenue_share_pct"] == 0
+    block = render.results_block(m)
+    assert "| Repeat-purchase rate | 0.00% |" in block
+    assert "| Revenue share from repeat customers (identified customers) | 0.00% |" in block
+    assert "| Month-1 cohort retention | 0.00% |" in block

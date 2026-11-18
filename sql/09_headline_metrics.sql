@@ -45,9 +45,9 @@ SELECT
     ROUND(rev.revenue_total / rev.orders, 2) AS aov,
     cust.customers,
     cust.repeat_customers,
-    ROUND(100.0 * cust.repeat_customers / cust.customers, 2)
+    COALESCE(ROUND(100.0 * cust.repeat_customers / cust.customers, 2), 0)
         AS repeat_purchase_rate_pct,
-    ROUND(100.0 * cust.repeat_revenue / cust.identified_revenue, 2)
+    COALESCE(ROUND(100.0 * cust.repeat_revenue / cust.identified_revenue, 2), 0)
         AS repeat_revenue_share_pct,
     ROUND(100.0 * guest.guest_revenue / rev.revenue_total, 2)
         AS guest_revenue_share_pct,
@@ -55,7 +55,7 @@ SELECT
     inv.cancelled_invoices,
     ROUND(100.0 * inv.cancelled_invoices / inv.invoices, 2)
         AS cancellation_rate_pct,
-    ROUND(
+    COALESCE(ROUND(
         100.0
         * (SELECT SUM(active_customers) FROM cohort_retention
             WHERE month_index = 1)
@@ -63,7 +63,7 @@ SELECT
             WHERE month_index = 0
                 AND cohort_month < (SELECT MAX(month) FROM monthly_revenue)),
         2
-    ) AS month1_retention_pct,
+    ), 0) AS month1_retention_pct,
     ROUND(inv.raw_positive_revenue, 2) AS raw_positive_revenue,
     ROUND(inv.raw_positive_revenue - rev.revenue_total, 2) AS revenue_gap
 FROM rev, guest, cust, inv;
