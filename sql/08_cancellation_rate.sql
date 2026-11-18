@@ -6,10 +6,10 @@ CREATE VIEW monthly_cancellation AS
 SELECT
     SUBSTR(InvoiceDate, 1, 7) AS month,
     COUNT(DISTINCT InvoiceNo) AS invoices,
-    COUNT(DISTINCT CASE WHEN InvoiceNo LIKE 'C%' THEN InvoiceNo END)
+    COUNT(DISTINCT CASE WHEN InvoiceNo GLOB 'C*' THEN InvoiceNo END)
         AS cancelled_invoices,
     ROUND(
-        100.0 * COUNT(DISTINCT CASE WHEN InvoiceNo LIKE 'C%' THEN InvoiceNo END)
+        100.0 * COUNT(DISTINCT CASE WHEN InvoiceNo GLOB 'C*' THEN InvoiceNo END)
         / COUNT(DISTINCT InvoiceNo),
         2
     ) AS cancellation_rate_pct

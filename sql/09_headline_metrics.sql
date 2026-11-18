@@ -29,7 +29,7 @@ inv AS (
     SELECT
         COUNT(*) AS rows_loaded,
         COUNT(DISTINCT InvoiceNo) AS invoices,
-        COUNT(DISTINCT CASE WHEN InvoiceNo LIKE 'C%' THEN InvoiceNo END)
+        COUNT(DISTINCT CASE WHEN InvoiceNo GLOB 'C*' THEN InvoiceNo END)
             AS cancelled_invoices,
         COALESCE(
             SUM(CASE WHEN Quantity > 0 AND UnitPrice > 0

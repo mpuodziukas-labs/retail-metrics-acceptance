@@ -93,7 +93,7 @@ def _line(m):
     mm = m["monthly"]
     top = mm[-1]["running_total"]
     w, left = 720, 10
-    step = (w - 2 * left) / (len(mm) - 1)
+    step = (w - 2 * left) / max(len(mm) - 1, 1)
     pts = " ".join(f"{left + i * step:.1f},{190 - 150 * r['running_total'] / top:.1f}"
                    for i, r in enumerate(mm))
     last = len(mm) - 1

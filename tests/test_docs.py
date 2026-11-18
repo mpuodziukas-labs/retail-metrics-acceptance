@@ -236,3 +236,40 @@ def test_regen_creates_missing_out_folder(tmp_path, monkeypatch):
 def test_regen_creates_missing_dashboard_folder(tmp_path, monkeypatch):
     _regen_without(tmp_path, monkeypatch, "dashboard")
     assert (tmp_path / "dashboard/index.html").is_file()
+
+
+def _snapshot(root):
+    return {p: (root / p).read_text() for p in regen.OUTPUTS}
+
+
+@pytest.mark.parametrize("name", ["dashboard", "recommendation", "results_block"])
+def test_regen_render_failure_leaves_previous_outputs_untouched(tmp_path, monkeypatch, name):
+    _scratch_root(tmp_path, (ROOT / "README.md").read_text())
+    before = _snapshot(tmp_path)
+    monkeypatch.setattr(regen, "ROOT", tmp_path)
+
+    def boom(m):
+        raise RuntimeError("render failed")
+    monkeypatch.setattr(render, name, boom)
+    with pytest.raises(RuntimeError):
+        regen.main()
+    assert _snapshot(tmp_path) == before
+
+
+HEADER = "InvoiceNo,StockCode,Description,Quantity,InvoiceDate,UnitPrice,CustomerID,Country\n"
+
+
+@pytest.mark.parametrize("body", ["", "C1,S1,Alpha,-1,2011-01-05 10:00:00,5.0,c1,France\n"],
+                         ids=["header_only", "all_cancelled"])
+def test_regen_refuses_when_there_are_no_clean_order_lines(tmp_path, monkeypatch, capsys, body):
+    csv_path = tmp_path / "empty.csv"
+    csv_path.write_text(HEADER + body)
+    root = tmp_path / "root"
+    root.mkdir()
+    _scratch_root(root, (ROOT / "README.md").read_text())
+    before = _snapshot(root)
+    monkeypatch.setattr(run, "CSV", csv_path)
+    monkeypatch.setattr(regen, "ROOT", root)
+    assert regen.main() == 1
+    assert capsys.readouterr().out == "GATE RED: regen refused, no clean order lines\n"
+    assert _snapshot(root) == before

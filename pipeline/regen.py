@@ -17,17 +17,19 @@ def main():
         print("GATE RED: regen refused")
         return 1
     m = run.compute_metrics(conn, checks)
-    (ROOT / "out").mkdir(exist_ok=True)
-    (ROOT / "out/metrics.json").write_text(run.dump(m))
-    (ROOT / "dashboard").mkdir(exist_ok=True)
-    (ROOT / "dashboard/index.html").write_text(render.dashboard(m))
-    (ROOT / "docs/recommendation.md").write_text(render.recommendation(m))
+    if not m["monthly"]:
+        print("GATE RED: regen refused, no clean order lines")
+        return 1
     readme = (ROOT / "README.md").read_text()
     block = render.results_block(m)
     new, n = re.subn(r"(<!-- RESULTS:START -->\n).*?(\n<!-- RESULTS:END -->)",
                      lambda mo: mo.group(1) + block + mo.group(2), readme, flags=re.S)
     assert n == 1, "README markers missing"
-    (ROOT / "README.md").write_text(new)
+    texts = [run.dump(m), render.dashboard(m), render.recommendation(m), new]
+    (ROOT / "out").mkdir(exist_ok=True)
+    (ROOT / "dashboard").mkdir(exist_ok=True)
+    for path, text in zip(OUTPUTS, texts):
+        (ROOT / path).write_text(text)
     print("regen done: " + ", ".join(OUTPUTS))
     return 0
 

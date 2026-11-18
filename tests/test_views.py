@@ -211,3 +211,99 @@ def test_guest_only_data_renders_with_zero_rates(tmp_path_factory):
     assert "| Repeat-purchase rate | 0.00% |" in block
     assert "| Revenue share from repeat customers (identified customers) | 0.00% |" in block
     assert "| Month-1 cohort retention | 0.00% |" in block
+
+
+def _metrics_of(db):
+    return run.compute_metrics(db, run.run_quality(db, run.load_baseline()))
+
+
+def test_single_month_dashboard_draws_one_point(tmp_path_factory):
+    from pipeline import render
+    db = _build(tmp_path_factory, "onemonth", [
+        _row("M1", "S1", "Alpha", 2, "2011-06-01 10:00:00", 5.0, "c1", "France"),
+        _row("M2", "S1", "Alpha", 1, "2011-06-09 10:00:00", 5.0, "c2", "France")])
+    html = render.dashboard(_metrics_of(db))
+    assert '<polyline points="10.0,40.0" class="ln" />' in html
+
+
+@pytest.fixture
+def no_description(tmp_path_factory):
+    return _build(tmp_path_factory, "nodesc", [
+        _row("P1", "S1", "", 1, "2011-06-01 10:00:00", 4.0, "c1", "France")])
+
+
+def test_product_with_no_description_keeps_null_not_empty_string(no_description):
+    assert q(no_description, "SELECT StockCode, canonical_description FROM dim_products") == [
+        ("S1", None)]
+
+
+def test_clean_orders_keeps_lines_whose_product_has_no_description(no_description):
+    got = q(no_description, "SELECT InvoiceNo, description, line_revenue FROM clean_orders")
+    assert got == [("P1", None, 4.0)]
+
+
+@pytest.fixture
+def lower_c(tmp_path_factory):
+    # SPEC: a cancellation is an invoice number starting with C. c7 starts with a lower-case c.
+    return _build(tmp_path_factory, "lowerc", [
+        _row(n, "S1", "Alpha", 1, f"2011-05-0{i} 10:00:00", 5.0, "c1", "France")
+        for i, n in enumerate(("A1", "B1", "C8", "C9", "c7"), 1)])
+
+
+def test_lower_case_c_invoice_is_not_a_cancellation_flag(lower_c):
+    got = q(lower_c, "SELECT InvoiceNo, is_cancellation FROM clean_orders ORDER BY InvoiceNo")
+    assert got == [("A1", 0), ("B1", 0), ("C8", 1), ("C9", 1), ("c7", 0)]
+
+
+def test_lower_case_c_invoice_is_not_a_cancelled_invoice_in_monthly_rate(lower_c):
+    got = q(lower_c, "SELECT invoices, cancelled_invoices, cancellation_rate_pct "
+                     "FROM monthly_cancellation")
+    assert got == [(5, 2, 40.0)]
+
+
+def test_lower_case_c_invoice_is_not_a_cancelled_invoice_in_headline(lower_c):
+    got = q(lower_c, "SELECT invoices, cancelled_invoices, cancellation_rate_pct "
+                     "FROM headline_metrics")
+    assert got == [(5, 2, 40.0)]
+
+
+def test_order_seq_is_dense_when_a_customer_has_tied_lines(tmp_path_factory):
+    # X1 has two lines on one timestamp and X2 follows: three lines, so 1, 2, 3.
+    db = _build(tmp_path_factory, "tiedlines", [
+        _row("X1", "S1", "Alpha", 1, "2011-06-01 10:00:00", 3.0, "c1", "France"),
+        _row("X1", "S2", "Beta", 1, "2011-06-01 10:00:00", 2.0, "c1", "France"),
+        _row("X2", "S1", "Alpha", 1, "2011-06-02 10:00:00", 4.0, "c1", "France")])
+    got = q(db, "SELECT order_seq, running_customer_revenue FROM customer_order_windows "
+                "ORDER BY order_seq")
+    assert [r[0] for r in got] == [1, 2, 3]
+    assert got[1:] == [(2, 5.0), (3, 9.0)]
+
+
+def test_stock_code_case_is_preserved_in_top_products(tmp_path_factory):
+    db = _build(tmp_path_factory, "lowercode", [
+        _row("L1", "85123a", "Alpha", 1, "2011-06-01 10:00:00", 4.0, "c1", "France")])
+    assert q(db, "SELECT stock_code FROM product_country_revenue") == [("85123a",)]
+
+
+def test_raw_positive_revenue_is_zero_not_null_without_a_positive_line(tmp_path_factory):
+    db = _build(tmp_path_factory, "nopositive", [
+        _row("C1", "S1", "Alpha", -1, "2011-06-01 10:00:00", 5.0, "c1", "France")])
+    assert q(db, "SELECT raw_positive_revenue FROM headline_metrics") == [(0.0,)]
+
+
+@pytest.mark.parametrize("column", ["revenue_total", "raw_positive_revenue"])
+def test_headline_revenue_is_rounded_to_two_places(tmp_path_factory, column):
+    # 3 * 0.1111 = 0.3333 (0.33330000000000004 as a float): two places gives 0.33.
+    db = _build(tmp_path_factory, "rounding", [
+        _row("R1", "S1", "Alpha", 3, "2011-06-01 10:00:00", 0.1111, "c1", "France")])
+    m = _metrics_of(db)
+    assert m["headline"][column] == 0.33
+    assert f'"{column}": 0.33,' in run.dump(m)
+
+
+def test_rows_loaded_counts_a_row_with_no_invoice_number(tmp_path_factory):
+    db = _build(tmp_path_factory, "noinvoice", [
+        _row("O1", "S1", "Alpha", 1, "2011-06-01 10:00:00", 4.0, "c1", "France")])
+    db.execute("INSERT INTO raw_orders VALUES "
+               "(NULL, 'S1', 'Alpha', 1, '2011-06-02 10:00:00', 4.0, 'c1', 'France')")
+    assert q(db, "SELECT rows_loaded FROM headline_metrics") == [(2,)]

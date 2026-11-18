@@ -15,7 +15,7 @@ SELECT
     r.CustomerID,
     COALESCE(c.primary_country, r.Country) AS country,
     r.Quantity * r.UnitPrice AS line_revenue,
-    CASE WHEN r.InvoiceNo LIKE 'C%' THEN 1 ELSE 0 END AS is_cancellation
+    CASE WHEN r.InvoiceNo GLOB 'C*' THEN 1 ELSE 0 END AS is_cancellation
 FROM raw_orders r
 JOIN dim_products p
     ON r.StockCode = p.StockCode
