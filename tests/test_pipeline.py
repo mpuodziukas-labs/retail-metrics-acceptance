@@ -774,3 +774,21 @@ def test_the_run_script_exits_non_zero_on_overflowing_totals_and_writes_no_file(
     assert "sqlite3" not in done.stderr
     assert done.stderr.strip().splitlines()[-1] == (
         "ValueError: the order totals are too large to add")
+
+
+# ---- the 64-bit range check must be constant-time for floats too ----
+
+def test_the_64_bit_range_check_answers_a_float_at_once():
+    assert run.in_int64(1.5) is True
+    assert run.in_int64(1e30) is False
+    assert run.in_int64(-1e30) is False
+
+
+def test_a_price_beyond_64_bits_is_not_a_range_error_it_loads_and_flows_through(tmp_path):
+    # The 64-bit limit is for Quantity only. A UnitPrice of 1e19 is a plain finite price today.
+    path, out = tmp_path / "big.csv", tmp_path / "big.json"
+    _write([_line(Quantity="2", UnitPrice="10000000000000000000.0")], path)
+    got = run.build_db(path).execute("SELECT UnitPrice FROM raw_orders").fetchall()
+    assert got == [(1e19,)]
+    run.main(["--csv", str(path), "--out", str(out), "--no-quality"])
+    assert json.loads(out.read_text(encoding="utf-8"))["headline"]["revenue_total"] == 2e19

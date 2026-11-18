@@ -38,14 +38,17 @@ DATE_FORMAT =re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
 
 INT_TEXT = re.compile(r"-?[0-9]+")
 PRICE_TEXT = re.compile(r"-?([0-9]+\.?[0-9]*|\.[0-9]+)")
-INT64 = range(-2**63, 2**63)
+
+
+def in_int64(value):
+    return -2**63 <= value < 2**63
 
 
 def _int(raw):
     if not INT_TEXT.fullmatch(raw):
         raise ValueError(raw)
     value = int(raw)
-    if value not in INT64:
+    if not in_int64(value):
         raise ValueError(raw)
     return value
 

@@ -19,3 +19,4 @@
 - fix: accept huge cells, refuse 64-bit overflow and Python-only numerals, count physical lines; pin month-1 retention denominator
 - fix: refuse overflowing totals and non-finite metrics by name; pin field-limit restore and .5 / 5. prices
 - test: pin that a non-overflow sqlite error reaches the caller unchanged
+- fix: make the 64-bit range check constant-time for any number; pin a 1e19 price
