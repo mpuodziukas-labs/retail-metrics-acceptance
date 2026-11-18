@@ -630,3 +630,69 @@ def test_a_negative_zero_price_is_a_zero_price_not_a_negative_one(tmp_path):
     assert checks["orphan_rows"]["observed"] == 0
     conn = run.build_db(tmp_path / "q.csv")
     assert conn.execute("SELECT InvoiceNo FROM clean_orders").fetchall() == [("D2",)]
+
+
+# ---- loader defects: field limit, 64-bit Quantity, Python-only numerals, physical lines ----
+
+def test_a_200000_character_description_loads_and_leaves_the_csv_field_limit_alone(tmp_path):
+    before = csv.field_size_limit()
+    path = tmp_path / "big.csv"
+    _write([_line(Description="x" * 200_000)], path)
+    conn = run.build_db(path)
+    assert conn.execute("SELECT LENGTH(Description) FROM raw_orders").fetchone() == (200_000,)
+    assert csv.field_size_limit() == before
+
+
+def test_the_csv_field_limit_is_restored_when_a_load_with_a_big_cell_fails(tmp_path):
+    before = csv.field_size_limit()
+    path = tmp_path / "bigbad.csv"
+    _write([_line(Description="x" * 200_000), _line(Quantity="abc")], path)
+    assert str(_load_error(path)) == "row 3, column Quantity: 'abc' is not a valid value"
+    assert csv.field_size_limit() == before
+
+
+@pytest.mark.parametrize("value", [str(2**63), "99999999999999999999", str(-2**63 - 1)])
+def test_quantity_outside_signed_64_bit_is_refused_by_name(tmp_path, value):
+    assert _bad_cell(tmp_path, "Quantity", value) == (
+        f"row 4, column Quantity: {value!r} is not a valid value")
+
+
+@pytest.mark.parametrize("value", [str(2**63 - 1), str(-2**63)])
+def test_quantity_at_the_signed_64_bit_boundary_loads_exactly(tmp_path, value):
+    path = tmp_path / "edge.csv"
+    _write([_line(Quantity=value)], path)
+    got = run.build_db(path).execute("SELECT Quantity FROM raw_orders").fetchall()
+    assert got == [(int(value),)]
+
+
+PYTHON_ONLY_NUMERALS = ["1_0", "+5", " 5", "5 ", "\t5", "5\t", "1e3", "0x10", "inf", "nan"]
+
+
+@pytest.mark.parametrize("column", ["Quantity", "UnitPrice"])
+@pytest.mark.parametrize("value", PYTHON_ONLY_NUMERALS)
+def test_loader_refuses_numerals_that_only_python_parses(tmp_path, column, value):
+    assert _bad_cell(tmp_path, column, value) == (
+        f"row 4, column {column}: {value!r} is not a valid value")
+
+
+def test_a_blank_line_does_not_shift_the_reported_row_number(tmp_path):
+    bad = b"A3,S3,x,abc,2011-01-05 10:00:00,1.0,c1,France"
+    path = _file_with(tmp_path, _CSV_HEAD, _CSV_GOOD, b"", bad)
+    assert str(_load_error(path)) == "row 4, column Quantity: 'abc' is not a valid value"
+
+
+def test_a_blank_line_does_not_shift_the_row_number_of_a_field_count_error(tmp_path):
+    bad = b"A3,S3,x,2,2011-01-05 10:00:00,1,5,c1,France"
+    path = _file_with(tmp_path, _CSV_HEAD, _CSV_GOOD, b"", bad)
+    assert str(_load_error(path)) == f"{path}: row 4: expected 8 fields, found 9"
+
+
+def test_a_multi_line_record_reports_the_line_on_which_it_ends(tmp_path):
+    bad = b'A3,S3,"two\nlines",abc,2011-01-05 10:00:00,1.0,c1,France'
+    path = _file_with(tmp_path, _CSV_HEAD, _CSV_GOOD, bad)
+    assert str(_load_error(path)) == "row 4, column Quantity: 'abc' is not a valid value"
+
+
+def test_blank_lines_are_still_skipped_and_the_rows_load(tmp_path):
+    path = _file_with(tmp_path, _CSV_HEAD, _CSV_GOOD, b"", _CSV_GOOD.replace(b"A1", b"A2"))
+    assert run.build_db(path).execute("SELECT COUNT(*) FROM raw_orders").fetchone() == (2,)

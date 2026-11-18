@@ -36,11 +36,23 @@ COLUMNS = ["InvoiceNo", "StockCode", "Description", "Quantity", "InvoiceDate", "
 DATE_FORMAT =re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
 
 
+INT_TEXT = re.compile(r"-?[0-9]+")
+PRICE_TEXT = re.compile(r"-?([0-9]+\.?[0-9]*|\.[0-9]+)")
+INT64 = range(-2**63, 2**63)
+
+
 def _int(raw):
-    return int(raw)
+    if not INT_TEXT.fullmatch(raw):
+        raise ValueError(raw)
+    value = int(raw)
+    if value not in INT64:
+        raise ValueError(raw)
+    return value
 
 
 def _price(raw):
+    if not PRICE_TEXT.fullmatch(raw):
+        raise ValueError(raw)
     value = float(raw)
     if not math.isfinite(value):
         raise ValueError(raw)
@@ -70,6 +82,15 @@ def _read_rows(csv_path):
     except UnicodeDecodeError as err:
         line = data[:err.start].count(b"\n") + 1
         raise ValueError(f"{csv_path}: not valid UTF-8 at line {line}") from None
+    old_limit = csv.field_size_limit()
+    csv.field_size_limit(max(old_limit, len(text) + 1))
+    try:
+        return _parse(csv_path, text)
+    finally:
+        csv.field_size_limit(old_limit)
+
+
+def _parse(csv_path, text):
     reader = csv.DictReader(io.StringIO(text, newline=""))
     names = reader.fieldnames
     if names is not None:
@@ -80,7 +101,8 @@ def _read_rows(csv_path):
         if missing:
             raise ValueError(f"{csv_path}: missing column(s): {', '.join(missing)}")
     rows = []
-    for row_no, r in enumerate(reader, start=2):
+    for r in reader:
+        row_no = reader.line_num
         if None in r or None in r.values():
             found = len(names) + len(r[None]) if None in r else sum(v is not None for v in r.values())
             raise ValueError(f"{csv_path}: row {row_no}: expected {len(names)} fields, found {found}")

@@ -438,3 +438,16 @@ def test_dashboard_tile_label_is_html_escaped(tiny, monkeypatch):
     assert '<span class="k">Net &lt;b&gt; &amp; gross</span>' in html
     assert "Net <b>" not in html
 
+
+
+def test_month1_retention_divides_by_month_0_cohort_sizes(tmp_path_factory):
+    # Jan cohort A,B (2); Feb cohort D (1); Mar cohort C (1, latest month, left out).
+    # Only B returns in month 1, so 1 / (2 + 1) = 33.33. Dividing by month-1 cohort
+    # sizes (Jan only, 2) would give 50.0.
+    db = _build(tmp_path_factory, "retention", [
+        _row("R1", "S1", "Alpha", 1, "2011-01-05 10:00:00", 5.0, "A", "France"),
+        _row("R2", "S1", "Alpha", 1, "2011-01-06 10:00:00", 5.0, "B", "France"),
+        _row("R3", "S1", "Alpha", 1, "2011-02-05 10:00:00", 5.0, "B", "France"),
+        _row("R4", "S1", "Alpha", 1, "2011-02-06 10:00:00", 5.0, "D", "France"),
+        _row("R5", "S1", "Alpha", 1, "2011-03-05 10:00:00", 5.0, "C", "France")])
+    assert q(db, "SELECT month1_retention_pct FROM headline_metrics") == [(33.33,)]
