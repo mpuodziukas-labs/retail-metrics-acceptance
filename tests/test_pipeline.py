@@ -533,6 +533,88 @@ def test_an_extra_unknown_column_is_accepted_and_ignored(tmp_path):
         sql).fetchall()
 
 
+_REQUIRED = ["InvoiceNo", "StockCode", "Description", "Quantity", "InvoiceDate", "UnitPrice",
+             "CustomerID", "Country"]
+
+
+def _head_without(*names):
+    return ",".join(f"Other{i}" if c in names else c for i, c in enumerate(_REQUIRED)).encode()
+
+
+@pytest.mark.parametrize("column", _REQUIRED)
+def test_a_header_missing_exactly_one_required_column_names_it(tmp_path, column):
+    path = _file_with(tmp_path, _head_without(column), _CSV_GOOD)
+    err = _load_error(path)
+    assert str(err) == f"{path}: missing column(s): {column}"
+    assert type(err) is ValueError
+
+
+def test_missing_columns_are_named_in_header_order_not_alphabetically(tmp_path):
+    path = _file_with(tmp_path, _head_without("CustomerID", "Quantity"), _CSV_GOOD)
+    assert str(_load_error(path)) == f"{path}: missing column(s): Quantity, CustomerID"
+
+
+def test_the_field_count_message_uses_the_header_width_not_a_fixed_eight(tmp_path):
+    head = _CSV_HEAD + b",Extra"
+    short = _file_with(tmp_path, head, _CSV_GOOD + b",z", _CSV_GOOD.replace(b"A1", b"A2"))
+    assert str(_load_error(short)) == f"{short}: row 3: expected 9 fields, found 8"
+    long_ = _file_with(tmp_path, head, _CSV_GOOD + b",z,q,r")
+    assert str(_load_error(long_)) == f"{long_}: row 2: expected 9 fields, found 11"
+
+
+@pytest.mark.parametrize("bad,found", [
+    (b"A3,,,2,2011-01-05 10:00:00,1.0", 6),
+    (b"A3,S3,x,2,,,", 7),
+    (b",,,,,,", 7),
+    (b"A3", 1)])
+def test_a_short_row_counts_blank_cells_as_fields(tmp_path, bad, found):
+    path = _file_with(tmp_path, _CSV_HEAD, bad)
+    assert str(_load_error(path)) == f"{path}: row 2: expected 8 fields, found {found}"
+
+
+def test_a_long_row_counts_blank_cells_as_fields(tmp_path):
+    path = _file_with(tmp_path, _CSV_HEAD, _CSV_GOOD + b",,,")
+    assert str(_load_error(path)) == f"{path}: row 2: expected 8 fields, found 11"
+
+
+@pytest.mark.parametrize("good_before", [0, 1, 3])
+@pytest.mark.parametrize("bad,found", [
+    (b"A9,S9,x,2,2011-01-05 10:00:00,1.0,c1,France,extra", 9),
+    (b"A9,S9,x,2,2011-01-05 10:00:00,1.0,c1", 7)])
+def test_the_field_count_row_number_is_the_file_row_wherever_it_sits(tmp_path, good_before, bad,
+                                                                       found):
+    goods = [_CSV_GOOD.replace(b"A1", b"G%d" % i) for i in range(good_before)]
+    path = _file_with(tmp_path, _CSV_HEAD, *goods, bad)
+    assert str(_load_error(path)) == (
+        f"{path}: row {good_before + 2}: expected 8 fields, found {found}")
+
+
+def test_a_duplicated_unknown_extra_column_is_rejected(tmp_path):
+    path = _file_with(tmp_path, _CSV_HEAD + b",Extra,Extra", _CSV_GOOD + b",1,2")
+    err = _load_error(path)
+    assert str(err) == f"{path}: duplicate column 'Extra'"
+    assert type(err) is ValueError
+
+
+@pytest.mark.parametrize("good_before", [0, 2])
+def test_a_bad_cell_after_a_byte_order_mark_names_its_file_row(tmp_path, good_before):
+    goods = [_CSV_GOOD.replace(b"A1", b"G%d" % i) for i in range(good_before)]
+    bad = _CSV_GOOD.replace(b",2,", b",two,")
+    path = tmp_path / "bom.csv"
+    path.write_bytes(b"\xef\xbb\xbf" + b"\n".join([_CSV_HEAD, *goods, bad]) + b"\n")
+    assert str(_load_error(path)) == (
+        f"row {good_before + 2}, column Quantity: 'two' is not a valid value")
+
+
+def test_only_a_byte_order_mark_at_the_start_of_the_file_is_stripped(tmp_path):
+    path = tmp_path / "mid.csv"
+    path.write_bytes(b"\xef\xbb\xbf" + b"\n".join(
+        [_CSV_HEAD, _CSV_GOOD, b"\xef\xbb\xbf" + _CSV_GOOD.replace(b"A1", b"A2")]) + b"\n")
+    ids = [i for (i,) in run.build_db(path).execute(
+        "SELECT InvoiceNo FROM raw_orders ORDER BY rowid")]
+    assert ids == ["A1", "﻿A2"]
+
+
 def test_a_utf_8_byte_order_mark_is_stripped_and_the_metrics_are_unchanged(tmp_path):
     bom = tmp_path / "bom.csv"
     bom.write_bytes(b"\xef\xbb\xbf" + run.CSV.read_bytes())

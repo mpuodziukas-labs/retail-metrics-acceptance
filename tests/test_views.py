@@ -93,6 +93,17 @@ def test_running_revenue_follows_date_not_invoice_number(reversed_numbers):
     assert got == [("B9", 1, 4.0), ("B2", 2, 10.0), ("B5", 3, 20.0)]
 
 
+def test_running_customer_revenue_restarts_for_every_customer(tiny):
+    rows = q(tiny, "SELECT CustomerID, InvoiceNo, line_revenue, running_customer_revenue "
+                   "FROM customer_order_windows ORDER BY CustomerID, InvoiceDate, InvoiceNo")
+    assert {c for c, *_ in rows} == {"c1", "c2"}
+    total, owner = 0.0, None
+    for customer, _invoice, line, running in rows:
+        total = line if customer != owner else total + line
+        owner = customer
+        assert running == pytest.approx(total)
+
+
 def test_top_products_tie_break_rank_and_units(tiny):
     got = q(tiny, "SELECT stock_code, revenue, units, revenue_rank, row_num "
                   "FROM product_country_revenue WHERE country = 'Italy' ORDER BY row_num")

@@ -15,3 +15,4 @@
 - test: pin description choice, zero-quantity filter, bare C invoice, per-customer sequence, line revenue and rounding
 - fix: strict loader errors, utf-8 file io, empty-run refusal; pin entry points, CI and published-file guard
 - fix: reject non-ASCII digits, bad field counts and header faults; strip BOM; pin loader, Makefile, CI and test-encoding gaps
+- test: pin loader header width, blank-cell counts, extra-column duplicates, required columns, BOM position and per-customer running total
