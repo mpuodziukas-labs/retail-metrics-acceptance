@@ -14,3 +14,4 @@
 - test: pin gate output, top-product order, duplicate key, Makefile and CI; run regen on a copy, guard published files
 - test: pin description choice, zero-quantity filter, bare C invoice, per-customer sequence, line revenue and rounding
 - fix: strict loader errors, utf-8 file io, empty-run refusal; pin entry points, CI and published-file guard
+- fix: reject non-ASCII digits, bad field counts and header faults; strip BOM; pin loader, Makefile, CI and test-encoding gaps

@@ -187,7 +187,7 @@ def test_published_file_guard_fails_a_test_run_that_writes_there(tmp_path, targe
     assert run_it().returncode == 0
 
 
-def _guard_copy(tmp_path, probe_body, seed_readme=True):
+def _guard_copy(tmp_path, probe_body, seed_readme=True, seed=()):
     copy = tmp_path / "copy"
     shutil.copytree(ROOT / "tests", copy / "tests", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(ROOT / "pipeline", copy / "pipeline",
@@ -195,6 +195,9 @@ def _guard_copy(tmp_path, probe_body, seed_readme=True):
     shutil.copy(ROOT / "pytest.ini", copy / "pytest.ini")
     (copy / "out").mkdir()
     (copy / "out" / "metrics.json").write_text('{"a": 1}\n', encoding="utf-8")
+    for rel in seed:
+        (copy / rel).parent.mkdir(parents=True, exist_ok=True)
+        (copy / rel).write_text("seed\n", encoding="utf-8")
     if seed_readme:
         (copy / "README.md").write_text("readme\n", encoding="utf-8")
     probe = copy / "tests" / "test_zz_probe.py"
@@ -211,6 +214,33 @@ def test_published_file_guard_catches_an_in_place_edit_of_out_metrics_json(tmp_p
         "def test_edit():\n"
         "    p = Path(__file__).resolve().parent.parent / 'out' / 'metrics.json'\n"
         "    p.write_text('{\"a\": 2}\\n', encoding='utf-8')\n")
+    assert done.returncode != 0, done.stdout
+    assert "a test wrote into out/, dashboard/, docs/ or README.md" in done.stdout
+
+
+@pytest.mark.parametrize("folder", ["out", "dashboard", "docs"])
+def test_published_file_guard_catches_an_in_place_edit_in_a_subfolder(tmp_path, folder):
+    done = _guard_copy(
+        tmp_path,
+        "from pathlib import Path\n\n"
+        "def test_edit():\n"
+        f"    p = Path(__file__).resolve().parent.parent / {folder!r} / 'deep' / 'inner.txt'\n"
+        "    assert p.read_text(encoding='utf-8') == 'seed\\n'\n"
+        "    p.write_text('changed\\n', encoding='utf-8')\n",
+        seed=[f"{folder}/deep/inner.txt"])
+    assert done.returncode != 0, done.stdout
+    assert "a test wrote into out/, dashboard/, docs/ or README.md" in done.stdout
+
+
+@pytest.mark.parametrize("folder", ["out", "dashboard", "docs"])
+def test_published_file_guard_catches_a_new_file_in_a_new_subfolder(tmp_path, folder):
+    done = _guard_copy(
+        tmp_path,
+        "from pathlib import Path\n\n"
+        "def test_new():\n"
+        f"    p = Path(__file__).resolve().parent.parent / {folder!r} / 'deep' / 'new.txt'\n"
+        "    p.parent.mkdir(parents=True, exist_ok=True)\n"
+        "    p.write_text('x\\n', encoding='utf-8')\n")
     assert done.returncode != 0, done.stdout
     assert "a test wrote into out/, dashboard/, docs/ or README.md" in done.stdout
 
@@ -286,3 +316,29 @@ def test_run_script_output_is_identical_under_the_strictest_c_locale(tmp_path):
         env={**{k: v for k, v in os.environ.items() if k != "PYTHONPATH"}, **env})
     assert done.returncode == 0, done.stderr
     assert (strict / "x.json").read_bytes() == (default / "out" / "metrics.json").read_bytes()
+
+
+def _regen_outputs(copy):
+    done = _exec(copy, "regen.py", copy.parent)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert done.stdout.startswith("regen done: out/metrics.json")
+    return json.loads((copy / "out" / "metrics.json").read_text(encoding="utf-8"))
+
+
+def test_regen_accepts_data_with_no_attributed_customers(tmp_path):
+    copy = _fresh_copy(tmp_path)
+    _replace_csv(copy, lambda rows: [dict(r, CustomerID="") for r in rows])
+    m = _regen_outputs(copy)
+    assert m["cohorts"] == [] and len(m["monthly"]) > 1
+    assert (copy / "dashboard" / "index.html").is_file()
+    assert (copy / "docs" / "recommendation.md").is_file()
+
+
+def test_regen_accepts_a_file_that_covers_a_single_month(tmp_path):
+    copy = _fresh_copy(tmp_path)
+    _replace_csv(copy, lambda rows: [r for r in rows
+                                     if r["InvoiceDate"][:7] == rows[0]["InvoiceDate"][:7]])
+    m = _regen_outputs(copy)
+    assert len(m["monthly"]) == 1 and m["cohorts"]
+    assert (copy / "dashboard" / "index.html").is_file()
+    assert (copy / "docs" / "recommendation.md").is_file()

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 @pytest.fixture(scope="session")
 def rows():
-    with open(run.CSV, newline="") as fh:
+    with open(run.CSV, newline="", encoding="utf-8") as fh:
         return list(csv.DictReader(fh))
 
 

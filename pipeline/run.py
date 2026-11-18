@@ -31,7 +31,9 @@ CHECKS = [
 ]
 
 
-DATE_FORMAT = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
+COLUMNS = ["InvoiceNo", "StockCode", "Description", "Quantity", "InvoiceDate", "UnitPrice",
+           "CustomerID", "Country"]
+DATE_FORMAT =re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
 
 
 def _int(raw):
@@ -54,6 +56,8 @@ def _date(raw):
 
 def _cell(row_no, column, raw, parse):
     try:
+        if not raw.isascii():
+            raise ValueError(raw)
         return parse(raw)
     except ValueError:
         raise ValueError(f"row {row_no}, column {column}: {raw!r} is not a valid value") from None
@@ -62,12 +66,24 @@ def _cell(row_no, column, raw, parse):
 def _read_rows(csv_path):
     data = Path(csv_path).read_bytes()
     try:
-        text = data.decode("utf-8")
+        text = data.decode("utf-8-sig")
     except UnicodeDecodeError as err:
         line = data[:err.start].count(b"\n") + 1
         raise ValueError(f"{csv_path}: not valid UTF-8 at line {line}") from None
+    reader = csv.DictReader(io.StringIO(text, newline=""))
+    names = reader.fieldnames
+    if names is not None:
+        for name in names:
+            if names.count(name) > 1:
+                raise ValueError(f"{csv_path}: duplicate column {name!r}")
+        missing = [c for c in COLUMNS if c not in names]
+        if missing:
+            raise ValueError(f"{csv_path}: missing column(s): {', '.join(missing)}")
     rows = []
-    for row_no, r in enumerate(csv.DictReader(io.StringIO(text, newline="")), start=2):
+    for row_no, r in enumerate(reader, start=2):
+        if None in r or None in r.values():
+            found = len(names) + len(r[None]) if None in r else sum(v is not None for v in r.values())
+            raise ValueError(f"{csv_path}: row {row_no}: expected {len(names)} fields, found {found}")
         rows.append((r["InvoiceNo"], r["StockCode"] or None, r["Description"] or None,
                      _cell(row_no, "Quantity", r["Quantity"], _int),
                      _cell(row_no, "InvoiceDate", r["InvoiceDate"], _date),

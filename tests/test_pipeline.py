@@ -40,7 +40,7 @@ def test_baseline_records_known_duplicates(conn):
 
 
 def _write(rows, path):
-    with open(path, "w", newline="") as fh:
+    with open(path, "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))
         w.writeheader()
         w.writerows(rows)
@@ -77,7 +77,7 @@ def test_negative_price_detected(tmp_path, rows):
 def test_main_green_writes_metrics(tmp_path):
     out = tmp_path / "m.json"
     assert run.main(["--csv", str(run.CSV), "--out", str(out)]) == 0
-    assert json.loads(out.read_text())["headline"]["orders"] > 0
+    assert json.loads(out.read_text(encoding="utf-8"))["headline"]["orders"] > 0
 
 
 def test_main_red_exits_1_and_writes_nothing(tmp_path):
@@ -94,7 +94,7 @@ def test_mutant_disabled_quality_check_lets_fault_through(tmp_path):
     mutant = tmp_path / "mut.json"
     assert run.main(["--csv", str(bad), "--out", str(guarded)]) == 1
     assert run.main(["--csv", str(bad), "--out", str(mutant), "--no-quality"]) == 0
-    m = json.loads(mutant.read_text())
+    m = json.loads(mutant.read_text(encoding="utf-8"))
     assert m["headline"]["revenue_gap"] > 0, "silent revenue loss must be visible once the gate is off"
 
 
@@ -117,12 +117,12 @@ def test_metrics_json_is_deterministic(tmp_path):
 def test_vendored_sample_checksum_matches_source_note():
     import hashlib
     sha = hashlib.sha256(run.CSV.read_bytes()).hexdigest()
-    assert sha in (run.ROOT / "data" / "SOURCE.md").read_text()
+    assert sha in (run.ROOT / "data" / "SOURCE.md").read_text(encoding="utf-8")
 
 
 def test_selftest_fails_when_gate_misses_a_planted_fault(monkeypatch, capsys):
     def blind_gate(argv):
-        Path(argv[argv.index("--out") + 1]).write_text("{}")
+        Path(argv[argv.index("--out") + 1]).write_text("{}", encoding="utf-8")
         return 0
     monkeypatch.setattr(run, "main", blind_gate)
     assert selftest.main() == 1
@@ -180,7 +180,7 @@ def _stub_run(monkeypatch, fault_codes, write_on_fault=False):
             return 0
         calls.append(argv)
         if write_on_fault:
-            Path(argv[argv.index("--out") + 1]).write_text("{}")
+            Path(argv[argv.index("--out") + 1]).write_text("{}", encoding="utf-8")
         return fault_codes[len(calls) - 1]
     monkeypatch.setattr(run, "main", fake)
 
@@ -204,7 +204,7 @@ def test_plant_null_key_skips_guest_lines(tmp_path):
     src, dst = tmp_path / "s.csv", tmp_path / "d.csv"
     _write([_line(InvoiceNo="G1", CustomerID=""), _line(InvoiceNo="K1")], src)
     selftest.plant_null_key(src, dst)
-    with open(dst, newline="") as fh:
+    with open(dst, newline="", encoding="utf-8") as fh:
         got = {r["InvoiceNo"]: r["StockCode"] for r in csv.DictReader(fh)}
     assert got == {"G1": "S1", "K1": ""}
 
@@ -228,9 +228,9 @@ def test_vendored_sample_keeps_its_pound_sign(conn):
 def test_sql_files_are_applied_in_name_order(tmp_path, monkeypatch):
     sql = tmp_path / "sql"
     sql.mkdir()
-    (sql / "01_first.sql").write_text("DROP VIEW IF EXISTS v; CREATE VIEW v AS SELECT 1 AS n;")
-    (sql / "02_second.sql").write_text("DROP VIEW IF EXISTS v; CREATE VIEW v AS SELECT 2 AS n;")
-    (sql / "notes.txt").write_text("this is not sql")
+    (sql / "01_first.sql").write_text("DROP VIEW IF EXISTS v; CREATE VIEW v AS SELECT 1 AS n;", encoding="utf-8")
+    (sql / "02_second.sql").write_text("DROP VIEW IF EXISTS v; CREATE VIEW v AS SELECT 2 AS n;", encoding="utf-8")
+    (sql / "notes.txt").write_text("this is not sql", encoding="utf-8")
     _write([_line()], tmp_path / "o.csv")
     monkeypatch.setattr(run, "SQL_DIR", sql)
     assert run.build_db(tmp_path / "o.csv").execute("SELECT n FROM v").fetchall() == [(2,)]
@@ -240,7 +240,7 @@ def test_plant_null_key_skips_zero_price_lines(tmp_path):
     src, dst = tmp_path / "s.csv", tmp_path / "d.csv"
     _write([_line(InvoiceNo="Z1", UnitPrice="0.0"), _line(InvoiceNo="K1")], src)
     selftest.plant_null_key(src, dst)
-    with open(dst, newline="") as fh:
+    with open(dst, newline="", encoding="utf-8") as fh:
         got = {r["InvoiceNo"]: r["StockCode"] for r in csv.DictReader(fh)}
     assert got == {"Z1": "S1", "K1": ""}
 
@@ -280,7 +280,7 @@ def test_orphan_rows_check_alone_turns_the_gate_red(tmp_path, monkeypatch, capsy
     # The null-key line is allowed through its own check, so only orphan_rows can stop the run.
     baseline = tmp_path / "baseline.json"
     allowed = dict(run.load_baseline(), null_join_key=1)
-    baseline.write_text(json.dumps(allowed))
+    baseline.write_text(json.dumps(allowed), encoding="utf-8")
     monkeypatch.setattr(run, "BASELINE", baseline)
     bad, out = tmp_path / "null.csv", tmp_path / "m.json"
     selftest.plant_null_key(run.CSV, bad)
@@ -308,7 +308,7 @@ def test_plant_duplicate_copies_a_sold_line_not_a_return(tmp_path):
     src, dst = tmp_path / "s.csv", tmp_path / "d.csv"
     _write([_line(InvoiceNo="C1", Quantity="-3"), _line(InvoiceNo="S1", Quantity="2")], src)
     selftest.plant_duplicate(src, dst)
-    with open(dst, newline="") as fh:
+    with open(dst, newline="", encoding="utf-8") as fh:
         got = [(r["InvoiceNo"], r["Quantity"]) for r in csv.DictReader(fh)]
     assert got == [("C1", "-3"), ("S1", "2"), ("S1", "2")]
 
@@ -330,3 +330,221 @@ def test_every_text_io_call_in_pipeline_names_its_encoding():
                 assert any(k.arg == "encoding" for k in node.keywords), (
                     f"{path.name}:{node.lineno} {name}() has no encoding")
     assert seen >= 7
+
+
+# ---- strict loader pins -------------------------------------------------------------------
+
+@pytest.mark.parametrize("value", [
+    "2011-01-05 10:00:00 ", " 2011-01-05 10:00:00", "2011-01-05 10:00:00\t",
+    "2011-1-05 10:00:00", "2011-01-5 10:00:00", "2011-01-05 1:00:00", "2011-01-05 10:0:00",
+    "2011-01-05 10:00:0", "11-01-05 10:00:00", "211-01-05 10:00:00"])
+def test_loader_rejects_a_date_that_is_not_exactly_yyyy_mm_dd_hh_mm_ss(tmp_path, value):
+    assert _bad_cell(tmp_path, "InvoiceDate", value) == (
+        f"row 4, column InvoiceDate: {value!r} is not a valid value")
+
+
+@pytest.mark.parametrize("value", [
+    "inf", "-inf", "+inf", "Inf", "-Inf", "INF", "-INF", "infinity", "-Infinity", "INFINITY",
+    "nan", "-nan", "+nan", "NaN", "NAN"])
+def test_loader_rejects_a_non_finite_price_in_any_letter_case(tmp_path, value):
+    assert _bad_cell(tmp_path, "UnitPrice", value) == (
+        f"row 4, column UnitPrice: {value!r} is not a valid value")
+
+
+@pytest.mark.parametrize("column,value", [("Quantity", "abc"), ("UnitPrice", "abc"),
+                                          ("InvoiceDate", "yesterday")])
+def test_bad_cell_message_is_exactly_row_column_value_is_not_a_valid_value(
+        tmp_path, column, value):
+    assert _bad_cell(tmp_path, column, value) == (
+        f"row 4, column {column}: '{value}' is not a valid value")
+
+
+def _load_error(path):
+    with pytest.raises(ValueError) as caught:
+        run.build_db(path)
+    return caught.value
+
+
+@pytest.mark.parametrize("column,value", [("Quantity", "abc"), ("UnitPrice", "inf"),
+                                          ("InvoiceDate", "2011-01-05")])
+def test_bad_cell_error_carries_no_exception_chain(tmp_path, column, value):
+    path = tmp_path / "bad.csv"
+    _write([_line(**{column: value})], path)
+    err = _load_error(path)
+    assert err.__cause__ is None and err.__suppress_context__ is True
+
+
+_CSV_HEAD = b"InvoiceNo,StockCode,Description,Quantity,InvoiceDate,UnitPrice,CustomerID,Country"
+_CSV_GOOD = b"A1,S1,x,2,2011-01-05 10:00:00,2.0,c1,France"
+_CSV_LATIN = b"A2,S2,caf\xe9,2,2011-01-05 10:00:00,2.0,c1,France"
+
+
+def _non_utf8_file(tmp_path, terminator):
+    path = tmp_path / "latin.csv"
+    path.write_bytes(terminator.join([_CSV_HEAD, _CSV_GOOD, _CSV_LATIN]) + terminator)
+    return path
+
+
+@pytest.mark.parametrize("terminator,line", [(b"\n", 3), (b"\r\n", 3), (b"\r", 1)])
+def test_non_utf_8_error_counts_lines_by_line_feed(tmp_path, terminator, line):
+    # A CR-only file has no LF, so the whole file is "line 1"; that is the pinned rule.
+    path = _non_utf8_file(tmp_path, terminator)
+    assert str(_load_error(path)) == f"{path}: not valid UTF-8 at line {line}"
+
+
+def test_non_utf_8_error_in_the_header_names_line_1(tmp_path):
+    path = tmp_path / "head.csv"
+    path.write_bytes(_CSV_HEAD.replace(b"Country", b"Pa\xffs") + b"\n" + _CSV_GOOD + b"\n")
+    assert str(_load_error(path)) == f"{path}: not valid UTF-8 at line 1"
+
+
+def test_non_utf_8_error_carries_no_exception_chain(tmp_path):
+    err = _load_error(_non_utf8_file(tmp_path, b"\n"))
+    assert err.__cause__ is None and err.__suppress_context__ is True
+
+
+@pytest.mark.parametrize("terminator,quoted", [
+    (b"\n", b"two\nlines"), (b"\r\n", b"two\r\nlines"), (b"\n", b"two\rlines")],
+    ids=["lf-in-lf-file", "crlf-in-crlf-file", "lone-cr-in-lf-file"])
+def test_a_quoted_newline_in_a_description_loads_as_one_row(tmp_path, terminator, quoted):
+    path = tmp_path / "q.csv"
+    second = b'A2,S2,"' + quoted + b'",3,2011-01-06 10:00:00,1.5,c2,France'
+    path.write_bytes(terminator.join([_CSV_HEAD, _CSV_GOOD, second]) + terminator)
+    got = run.build_db(path).execute(
+        "SELECT InvoiceNo, Description FROM raw_orders ORDER BY InvoiceNo").fetchall()
+    assert got == [("A1", "x"), ("A2", quoted.decode())]
+
+
+def test_a_file_with_carriage_return_only_line_ends_loads_every_row(tmp_path):
+    path = tmp_path / "cr.csv"
+    path.write_bytes(b"\r".join([_CSV_HEAD, _CSV_GOOD, _CSV_GOOD.replace(b"A1", b"A2")]) + b"\r")
+    conn = run.build_db(path)
+    assert conn.execute("SELECT InvoiceNo FROM raw_orders ORDER BY 1").fetchall() == [
+        ("A1",), ("A2",)]
+
+
+def test_a_blank_invoice_number_loads_as_empty_text_not_null(tmp_path):
+    path = tmp_path / "blank.csv"
+    _write([_line(InvoiceNo="")], path)
+    conn = run.build_db(path)
+    assert conn.execute("SELECT typeof(InvoiceNo), InvoiceNo FROM raw_orders").fetchall() == [
+        ("text", "")]
+
+
+# ---- empty-result refusal -----------------------------------------------------------------
+
+def _main_on(tmp_path, lines, capsys):
+    path, out = tmp_path / "e.csv", tmp_path / "m.json"
+    _write(lines, path)
+    code = run.main(["--csv", str(path), "--out", str(out)])
+    return code, capsys.readouterr().out, out
+
+
+def test_no_clean_lines_prints_the_exact_refusal_and_writes_nothing(tmp_path, capsys):
+    code, text, out = _main_on(tmp_path, [_line(InvoiceNo="C1", Quantity="-2")], capsys)
+    assert code == 1 and not out.exists()
+    assert text.endswith("ok  orphan_rows (integrity): observed 0, allowed 0\n"
+                         "no clean order lines; nothing to report\n")
+
+
+def test_a_failed_gate_is_reported_before_the_no_clean_lines_refusal(tmp_path, capsys):
+    # One negative-price line: the gate is RED and clean_orders is empty. The gate wins.
+    code, text, out = _main_on(tmp_path, [_line(UnitPrice="-1.0")], capsys)
+    assert code == 1 and not out.exists()
+    assert "RED negative_price (validity): observed 1, allowed 0\n" in text
+    assert text.endswith("GATE RED: no metrics written\n")
+    assert "no clean order lines" not in text
+
+
+def test_a_file_with_exactly_one_clean_line_is_not_refused(tmp_path, capsys):
+    code, text, out = _main_on(tmp_path, [_line()], capsys)
+    assert code == 0, text
+    assert text.endswith("GATE GREEN: wrote m.json\n")
+    m = json.loads(out.read_text(encoding="utf-8"))
+    assert m["headline"]["orders"] == 1 and len(m["monthly"]) == 1
+
+
+# ---- the oracle fixture reads the CSV as UTF-8 --------------------------------------------
+
+def test_oracle_rows_are_read_as_utf_8(rows, conn):
+    seen = {r["Description"] for r in rows if r["Description"]}
+    loaded = {d for (d,) in conn.execute(
+        "SELECT DISTINCT Description FROM raw_orders WHERE Description IS NOT NULL")}
+    assert seen == loaded
+    assert any("£" in d for d in seen)
+
+
+# ---- loader defects found by probes: ASCII-only cells, field count, header, BOM -----------
+
+@pytest.mark.parametrize("column,value", [
+    ("Quantity", "٥"), ("Quantity", "５"), ("UnitPrice", "٢.٥"),
+    ("UnitPrice", "２.5"), ("InvoiceDate", "٢٠١١-01-05 10:00:00"),
+    ("InvoiceDate", "2011-01-0٥ 10:00:00")])
+def test_loader_rejects_non_ascii_digits_in_a_numeric_or_date_cell(tmp_path, column, value):
+    assert _bad_cell(tmp_path, column, value) == (
+        f"row 4, column {column}: {value!r} is not a valid value")
+
+
+def _file_with(tmp_path, head, *body):
+    path = tmp_path / "f.csv"
+    path.write_bytes(b"\n".join([head, *body]) + b"\n")
+    return path
+
+
+def test_a_row_with_more_fields_than_the_header_names_the_file_and_row(tmp_path):
+    # An unquoted decimal comma in the price shifts every later column.
+    bad = b"A3,S3,x,2,2011-01-05 10:00:00,1,5,c1,France"
+    path = _file_with(tmp_path, _CSV_HEAD, _CSV_GOOD, _CSV_GOOD.replace(b"A1", b"A2"), bad)
+    err = _load_error(path)
+    assert str(err) == f"{path}: row 4: expected 8 fields, found 9"
+    assert type(err) is ValueError
+
+
+def test_a_row_with_fewer_fields_than_the_header_names_the_file_and_row(tmp_path):
+    bad = b"A3,S3,x,2,2011-01-05 10:00:00,1.0,c1"
+    path = _file_with(tmp_path, _CSV_HEAD, _CSV_GOOD, _CSV_GOOD.replace(b"A1", b"A2"), bad)
+    err = _load_error(path)
+    assert str(err) == f"{path}: row 4: expected 8 fields, found 7"
+    assert type(err) is ValueError
+
+
+def test_a_duplicate_column_name_is_rejected(tmp_path):
+    head = _CSV_HEAD.replace(b"Country", b"Quantity")
+    path = _file_with(tmp_path, head, _CSV_GOOD)
+    err = _load_error(path)
+    assert str(err) == f"{path}: duplicate column 'Quantity'"
+    assert type(err) is ValueError
+
+
+def test_a_missing_required_column_is_named(tmp_path):
+    head = _CSV_HEAD.replace(b"Country", b"Ctry").replace(b"UnitPrice", b"Price")
+    path = _file_with(tmp_path, head, _CSV_GOOD)
+    err = _load_error(path)
+    assert str(err) == f"{path}: missing column(s): UnitPrice, Country"
+    assert type(err) is ValueError
+
+
+def test_an_extra_unknown_column_is_accepted_and_ignored(tmp_path):
+    plain = _file_with(tmp_path, _CSV_HEAD, _CSV_GOOD)
+    extra = tmp_path / "extra.csv"
+    extra.write_bytes(_CSV_HEAD + b",Extra\n" + _CSV_GOOD + b",zzz\n")
+    sql = "SELECT * FROM raw_orders ORDER BY InvoiceNo"
+    assert run.build_db(extra).execute(sql).fetchall() == run.build_db(plain).execute(
+        sql).fetchall()
+
+
+def test_a_utf_8_byte_order_mark_is_stripped_and_the_metrics_are_unchanged(tmp_path):
+    bom = tmp_path / "bom.csv"
+    bom.write_bytes(b"\xef\xbb\xbf" + run.CSV.read_bytes())
+    plain_out, bom_out = tmp_path / "plain.json", tmp_path / "bom.json"
+    assert run.main(["--csv", str(run.CSV), "--out", str(plain_out)]) == 0
+    assert run.main(["--csv", str(bom), "--out", str(bom_out)]) == 0
+    assert bom_out.read_bytes() == plain_out.read_bytes()
+
+
+def test_a_negative_zero_price_is_a_zero_price_not_a_negative_one(tmp_path):
+    checks = _checks(tmp_path, [_line(UnitPrice="-0.0"), _line(InvoiceNo="D2")])
+    assert checks["negative_price"]["observed"] == 0
+    assert checks["orphan_rows"]["observed"] == 0
+    conn = run.build_db(tmp_path / "q.csv")
+    assert conn.execute("SELECT InvoiceNo FROM clean_orders").fetchall() == [("D2",)]

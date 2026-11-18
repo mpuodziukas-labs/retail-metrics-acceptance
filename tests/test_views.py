@@ -36,7 +36,7 @@ REVERSED = [
 
 def _build(tmp_path_factory, name, fixture_rows):
     path = tmp_path_factory.mktemp(name) / f"{name}.csv"
-    with open(path, "w", newline="") as fh:
+    with open(path, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
         w.writerow(HEADER)
         w.writerows(fixture_rows)
