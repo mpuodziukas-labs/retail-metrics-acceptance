@@ -1,0 +1,20 @@
+python3 pipeline/selftest.py
+RED duplicate_order_lines (uniqueness): observed 4, allowed 3
+ok  null_join_key (completeness): observed 0, allowed 0
+ok  negative_price (validity): observed 0, allowed 0
+ok  orphan_rows (integrity): observed 0, allowed 0
+GATE RED: no metrics written
+selftest duplicate order line: CAUGHT
+ok  duplicate_order_lines (uniqueness): observed 3, allowed 3
+RED null_join_key (completeness): observed 1, allowed 0
+ok  negative_price (validity): observed 0, allowed 0
+RED orphan_rows (integrity): observed 1, allowed 0
+GATE RED: no metrics written
+selftest NULL join key: CAUGHT
+ok  duplicate_order_lines (uniqueness): observed 3, allowed 3
+ok  null_join_key (completeness): observed 0, allowed 0
+ok  negative_price (validity): observed 0, allowed 0
+ok  orphan_rows (integrity): observed 0, allowed 0
+GATE GREEN: wrote m.json
+selftest clean sample stays green: yes
+SELFTEST PASS

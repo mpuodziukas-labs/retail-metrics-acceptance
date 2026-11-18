@@ -1,0 +1,6 @@
+python3 pipeline/regen.py
+regen done: out/metrics.json, dashboard/index.html, docs/recommendation.md, README.md
+python3 pipeline/regen.py
+regen done: out/metrics.json, dashboard/index.html, docs/recommendation.md, README.md
+git diff --stat after second regen:
+(end)
