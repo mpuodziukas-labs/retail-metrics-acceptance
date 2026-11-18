@@ -11,3 +11,4 @@
 - test: pin running order, null-key price rule, HTML escaping, regen file list
 - fix: break primary-country ties, zero-fill guest-only rates, pin view and gate edges
 - fix: render one-month charts, refuse empty data, write outputs after renders, match cancellation prefix by case
+- test: pin gate output, top-product order, duplicate key, Makefile and CI; run regen on a copy, guard published files

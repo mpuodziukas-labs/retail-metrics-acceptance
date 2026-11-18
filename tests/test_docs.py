@@ -131,10 +131,14 @@ def test_no_em_dash_in_repo_files():
             assert chr(0x2014) not in p.read_text(errors="ignore"), p
 
 
-def test_regen_is_idempotent_on_disk():
-    before = {p: (ROOT / p).read_bytes() for p in regen.OUTPUTS}
-    regen.main()
-    assert {p: (ROOT / p).read_bytes() for p in regen.OUTPUTS} == before
+def test_regen_is_idempotent_on_disk(tmp_path, monkeypatch):
+    for p in regen.OUTPUTS:
+        (tmp_path / p).parent.mkdir(exist_ok=True)
+        (tmp_path / p).write_bytes((ROOT / p).read_bytes())
+    monkeypatch.setattr(regen, "ROOT", tmp_path)
+    assert regen.main() == 0
+    assert {p: (tmp_path / p).read_bytes() for p in regen.OUTPUTS} == {
+        p: (ROOT / p).read_bytes() for p in regen.OUTPUTS}
 
 
 def test_regen_overwrites_stale_outputs(tmp_path, monkeypatch):
@@ -173,13 +177,14 @@ def test_regen_refuses_when_readme_markers_missing(tmp_path, monkeypatch):
     assert (tmp_path / "README.md").read_text() == "no markers here\n"
 
 
-def test_regen_refuses_when_gate_is_red(tmp_path, monkeypatch):
+def test_regen_refuses_when_gate_is_red(tmp_path, monkeypatch, capsys):
     readme = (ROOT / "README.md").read_text()
     _scratch_root(tmp_path, readme)
     monkeypatch.setattr(regen, "ROOT", tmp_path)
     red = [{"name": "x", "dimension": "d", "observed": 1, "allowed": 0, "ok": False}]
     monkeypatch.setattr(run, "run_quality", lambda conn, baseline: red)
     assert regen.main() == 1
+    assert capsys.readouterr().out == "GATE RED: regen refused\n"
     for p in ("out/metrics.json", "dashboard/index.html", "docs/recommendation.md"):
         assert (tmp_path / p).read_text() == "stale"
     assert (tmp_path / "README.md").read_text() == readme
@@ -273,3 +278,26 @@ def test_regen_refuses_when_there_are_no_clean_order_lines(tmp_path, monkeypatch
     assert regen.main() == 1
     assert capsys.readouterr().out == "GATE RED: regen refused, no clean order lines\n"
     assert _snapshot(root) == before
+
+
+def test_regen_stops_replacing_at_the_first_results_end_marker(tmp_path, monkeypatch):
+    readme = (ROOT / "README.md").read_text()
+    tail = "\nkept text\n<!-- RESULTS:END -->\nmore kept text\n"
+    _scratch_root(tmp_path, readme + tail)
+    monkeypatch.setattr(regen, "ROOT", tmp_path)
+    assert regen.main() == 0
+    assert (tmp_path / "README.md").read_text() == readme + tail
+
+
+@pytest.mark.parametrize("value,text", [(2.5, "2"), (2.9, "2"), (3.5, "3"), (1234.9, "1,234")])
+def test_int_format_drops_the_fraction_and_groups_thousands(value, text):
+    assert render.f("int", value) == text
+
+
+def test_line_chart_is_scaled_to_the_last_running_total():
+    m = _metrics()
+    m["monthly"][-1]["running_total"] = 0.5 * m["monthly"][-2]["running_total"]
+    html = render.dashboard(m)
+    points = re.search(r'<polyline points="([^"]+)"', html).group(1).split()
+    assert points[-1].endswith(",40.0")
+    assert f'data-k="monthly.{len(m["monthly"]) - 1}.running_total" data-f="money0"' in html

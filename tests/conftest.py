@@ -1,6 +1,7 @@
 """Shared fixtures. Expected values are computed from the CSV with plain Python,
 never from the SQL under test."""
 import csv
+import hashlib
 from collections import defaultdict
 from pathlib import Path
 
@@ -59,3 +60,17 @@ def by_customer_months(rows):
             inv[r["CustomerID"]][r["InvoiceNo"]] += revenue(r)
             months[r["CustomerID"]].add(month(r))
     return inv, months
+
+
+def _tracked_state():
+    paths = [p for d in ("out", "dashboard", "docs") for p in sorted((ROOT / d).rglob("*"))]
+    paths.append(ROOT / "README.md")
+    return {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths if p.is_file()}
+
+
+@pytest.fixture(scope="session", autouse=True)
+def tests_never_write_published_files():
+    before = _tracked_state()
+    assert before
+    yield
+    assert _tracked_state() == before, "a test wrote into out/, dashboard/, docs/ or README.md"

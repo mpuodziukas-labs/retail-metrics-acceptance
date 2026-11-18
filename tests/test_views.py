@@ -307,3 +307,29 @@ def test_rows_loaded_counts_a_row_with_no_invoice_number(tmp_path_factory):
     db.execute("INSERT INTO raw_orders VALUES "
                "(NULL, 'S1', 'Alpha', 1, '2011-06-02 10:00:00', 4.0, 'c1', 'France')")
     assert q(db, "SELECT rows_loaded FROM headline_metrics") == [(2,)]
+
+
+@pytest.fixture(scope="module")
+def tied_countries(tmp_path_factory):
+    """Four countries with equal revenue, each with two equal-revenue products; the
+    rows are loaded in an order unrelated to the alphabet."""
+    rows = []
+    for country in ("Zed", "Mid", "Bar", "Alp"):
+        rows.append(_row("I" + country, "S1", "Alpha", 1, "2011-06-01 10:00:00", 5.0, "", country))
+        rows.append(_row("J" + country, "S2", "Beta", 1, "2011-06-02 10:00:00", 5.0, "", country))
+    return _metrics_of(_build(tmp_path_factory, "tiedcountries", rows))["top_products"]
+
+
+def test_top_products_keep_the_alphabetically_first_of_tied_countries(tied_countries):
+    assert {t["country"] for t in tied_countries} == {"Alp", "Bar", "Mid"}
+
+
+def test_top_products_list_tied_countries_alphabetically_then_by_rank(tied_countries):
+    assert [(t["country"], t["rank"]) for t in tied_countries] == [
+        ("Alp", 1), ("Alp", 2), ("Bar", 1), ("Bar", 2), ("Mid", 1), ("Mid", 2)]
+
+
+def test_top_products_rank_counts_tied_products_one_by_one(tied_countries):
+    first = [t for t in tied_countries if t["country"] == "Alp"]
+    assert [(t["rank"], t["stock_code"]) for t in first] == [(1, "S1"), (2, "S2")]
+

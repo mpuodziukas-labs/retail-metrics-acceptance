@@ -98,8 +98,13 @@ def test_mutant_disabled_quality_check_lets_fault_through(tmp_path):
     assert m["headline"]["revenue_gap"] > 0, "silent revenue loss must be visible once the gate is off"
 
 
-def test_selftest_catches_both_faults_and_keeps_control_green():
+def test_selftest_catches_both_faults_and_keeps_control_green(capsys):
     assert selftest.main() == 0
+    own = [l for l in capsys.readouterr().out.splitlines()
+           if l.startswith(("selftest ", "SELFTEST"))]
+    assert own == [
+        "selftest duplicate order line: CAUGHT", "selftest NULL join key: CAUGHT",
+        "selftest clean sample stays green: yes", "SELFTEST PASS"]
 
 
 def test_metrics_json_is_deterministic(tmp_path):
@@ -149,6 +154,13 @@ def test_lines_differing_only_in_price_are_not_duplicates(tmp_path):
     assert _checks(tmp_path, lines)["duplicate_order_lines"]["observed"] == 1
 
 
+@pytest.mark.parametrize("column,other", [("InvoiceDate", "2011-01-06 10:00:00"),
+                                          ("CustomerID", "c2")])
+def test_lines_differing_only_in_one_key_column_are_not_duplicates(tmp_path, column, other):
+    lines = [_line(), _line(**{column: other})]
+    assert _checks(tmp_path, lines)["duplicate_order_lines"]["observed"] == 0
+
+
 def test_null_key_ignores_a_non_sale_line(tmp_path):
     check = _checks(tmp_path, [_line(StockCode="", Quantity="-1", UnitPrice="3.5")])["null_join_key"]
     assert check["observed"] == 0 and check["ok"]
@@ -195,3 +207,39 @@ def test_plant_null_key_skips_guest_lines(tmp_path):
     with open(dst, newline="") as fh:
         got = {r["InvoiceNo"]: r["StockCode"] for r in csv.DictReader(fh)}
     assert got == {"G1": "S1", "K1": ""}
+
+
+def test_csv_is_read_as_utf_8(tmp_path):
+    path = tmp_path / "u.csv"
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(_line()))
+        w.writeheader()
+        w.writerow(_line(Description="Caf\u00e9 \u00a350 voucher"))
+    conn = run.build_db(path)
+    assert conn.execute("SELECT Description FROM raw_orders").fetchone()[0] == "Caf\u00e9 \u00a350 voucher"
+
+
+def test_vendored_sample_keeps_its_pound_sign(conn):
+    desc = conn.execute(
+        "SELECT Description FROM raw_orders WHERE Description LIKE '%Gift Voucher %'").fetchone()[0]
+    assert "\u00a3" in desc
+
+
+def test_sql_files_are_applied_in_name_order(tmp_path, monkeypatch):
+    sql = tmp_path / "sql"
+    sql.mkdir()
+    (sql / "01_first.sql").write_text("DROP VIEW IF EXISTS v; CREATE VIEW v AS SELECT 1 AS n;")
+    (sql / "02_second.sql").write_text("DROP VIEW IF EXISTS v; CREATE VIEW v AS SELECT 2 AS n;")
+    (sql / "notes.txt").write_text("this is not sql")
+    _write([_line()], tmp_path / "o.csv")
+    monkeypatch.setattr(run, "SQL_DIR", sql)
+    assert run.build_db(tmp_path / "o.csv").execute("SELECT n FROM v").fetchall() == [(2,)]
+
+
+def test_plant_null_key_skips_zero_price_lines(tmp_path):
+    src, dst = tmp_path / "s.csv", tmp_path / "d.csv"
+    _write([_line(InvoiceNo="Z1", UnitPrice="0.0"), _line(InvoiceNo="K1")], src)
+    selftest.plant_null_key(src, dst)
+    with open(dst, newline="") as fh:
+        got = {r["InvoiceNo"]: r["StockCode"] for r in csv.DictReader(fh)}
+    assert got == {"Z1": "S1", "K1": ""}
