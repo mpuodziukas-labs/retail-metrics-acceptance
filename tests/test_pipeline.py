@@ -1,5 +1,7 @@
 import csv
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -696,3 +698,62 @@ def test_a_multi_line_record_reports_the_line_on_which_it_ends(tmp_path):
 def test_blank_lines_are_still_skipped_and_the_rows_load(tmp_path):
     path = _file_with(tmp_path, _CSV_HEAD, _CSV_GOOD, b"", _CSV_GOOD.replace(b"A1", b"A2"))
     assert run.build_db(path).execute("SELECT COUNT(*) FROM raw_orders").fetchone() == (2,)
+
+
+# ---- pins: the limit restore from a known start, price spellings; refusals at the entry point ----
+
+def test_the_csv_field_limit_goes_back_to_its_own_start_value_not_the_raised_one(tmp_path):
+    # An earlier test may already have raised the global limit; start from a low, known value.
+    prior = csv.field_size_limit()
+    csv.field_size_limit(131072)
+    try:
+        path = tmp_path / "limit.csv"
+        _write([_line(Description="x" * 200_000)], path)
+        conn = run.build_db(path)
+        assert csv.field_size_limit() == 131072
+        assert conn.execute("SELECT LENGTH(Description) FROM raw_orders").fetchone() == (200_000,)
+    finally:
+        csv.field_size_limit(prior)
+
+
+@pytest.mark.parametrize("text,value", [(".5", 0.5), ("5.", 5.0)])
+def test_a_price_with_only_a_leading_or_only_a_trailing_point_loads(tmp_path, text, value):
+    path = tmp_path / "price.csv"
+    _write([_line(UnitPrice=text)], path)
+    got = run.build_db(path).execute("SELECT UnitPrice FROM raw_orders").fetchall()
+    assert got == [(value,)]
+
+
+def _entry(tmp_path, lines, capsys):
+    path, out = tmp_path / "e.csv", tmp_path / "m.json"
+    _write(lines, path)
+    with pytest.raises(ValueError) as caught:
+        run.main(["--csv", str(path), "--out", str(out), "--no-quality"])
+    assert type(caught.value) is ValueError and caught.value.__cause__ is None
+    assert not out.exists() and "GATE GREEN" not in capsys.readouterr().out
+    return str(caught.value)
+
+
+def test_totals_too_large_to_add_are_refused_by_name_and_nothing_is_written(tmp_path, capsys):
+    lines = [_line(InvoiceNo="D1", Quantity="9223372036854775807", UnitPrice="1.0"),
+             _line(InvoiceNo="D2", Quantity="1", UnitPrice="1.0")]
+    assert _entry(tmp_path, lines, capsys) == "the order totals are too large to add"
+
+
+def test_a_metric_that_is_not_a_finite_number_is_refused_and_nothing_is_written(tmp_path, capsys):
+    lines = [_line(Quantity="5", UnitPrice="9" * 308 + ".0")]
+    assert _entry(tmp_path, lines, capsys) == (
+        "a metric is not a finite number; no metrics written")
+
+
+def test_the_run_script_exits_non_zero_on_overflowing_totals_and_writes_no_file(tmp_path):
+    path, out = tmp_path / "o.csv", tmp_path / "o.json"
+    _write([_line(InvoiceNo="D1", Quantity="9223372036854775807", UnitPrice="1.0"),
+            _line(InvoiceNo="D2", Quantity="1", UnitPrice="1.0")], path)
+    done = subprocess.run([sys.executable, str(Path(run.__file__)), "--csv", str(path),
+                           "--out", str(out), "--no-quality"],
+                          cwd=tmp_path, capture_output=True, text=True, timeout=120)
+    assert done.returncode != 0 and not out.exists()
+    assert "sqlite3" not in done.stderr
+    assert done.stderr.strip().splitlines()[-1] == (
+        "ValueError: the order totals are too large to add")

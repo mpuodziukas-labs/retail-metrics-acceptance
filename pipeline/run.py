@@ -168,7 +168,10 @@ def compute_metrics(conn, quality):
 
 
 def dump(metrics):
-    return json.dumps(metrics, sort_keys=True, indent=2) + "\n"
+    try:
+        return json.dumps(metrics, sort_keys=True, indent=2, allow_nan=False) + "\n"
+    except ValueError:
+        raise ValueError("a metric is not a finite number; no metrics written") from None
 
 
 def main(argv=None):
@@ -188,9 +191,15 @@ def main(argv=None):
     if not conn.execute("SELECT COUNT(*) FROM clean_orders").fetchone()[0]:
         print("no clean order lines; nothing to report")
         return 1
+    try:
+        text = dump(compute_metrics(conn, checks))
+    except sqlite3.OperationalError as err:
+        if "integer overflow" not in str(err):
+            raise
+        raise ValueError("the order totals are too large to add") from None
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(dump(compute_metrics(conn, checks)), encoding="utf-8")
+    out.write_text(text, encoding="utf-8")
     print(f"GATE GREEN: wrote {out.name}")
     return 0
 
