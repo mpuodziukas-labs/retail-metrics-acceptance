@@ -2,6 +2,8 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 from pipeline import regen, render, run
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -153,3 +155,38 @@ def test_regen_overwrites_stale_outputs(tmp_path, monkeypatch):
     assert (tmp_path / "dashboard/index.html").read_text() == render.dashboard(m)
     assert (tmp_path / "docs/recommendation.md").read_text() == render.recommendation(m)
     assert (tmp_path / "README.md").read_text() == readme
+
+
+def _scratch_root(tmp_path, readme_text):
+    for d in ("out", "dashboard", "docs"):
+        (tmp_path / d).mkdir()
+    for p in ("out/metrics.json", "dashboard/index.html", "docs/recommendation.md"):
+        (tmp_path / p).write_text("stale")
+    (tmp_path / "README.md").write_text(readme_text)
+
+
+def test_regen_refuses_when_readme_markers_missing(tmp_path, monkeypatch):
+    _scratch_root(tmp_path, "no markers here\n")
+    monkeypatch.setattr(regen, "ROOT", tmp_path)
+    with pytest.raises(AssertionError):
+        regen.main()
+    assert (tmp_path / "README.md").read_text() == "no markers here\n"
+
+
+def test_regen_refuses_when_gate_is_red(tmp_path, monkeypatch):
+    readme = (ROOT / "README.md").read_text()
+    _scratch_root(tmp_path, readme)
+    monkeypatch.setattr(regen, "ROOT", tmp_path)
+    red = [{"name": "x", "dimension": "d", "observed": 1, "allowed": 0, "ok": False}]
+    monkeypatch.setattr(run, "run_quality", lambda conn, baseline: red)
+    assert regen.main() == 1
+    for p in ("out/metrics.json", "dashboard/index.html", "docs/recommendation.md"):
+        assert (tmp_path / p).read_text() == "stale"
+    assert (tmp_path / "README.md").read_text() == readme
+
+
+def test_results_block_counts_only_passing_quality_checks():
+    m = _metrics()
+    m["quality"][0] = dict(m["quality"][0], ok=False)
+    assert "| Quality checks passing | 3/4 |" in render.results_block(m)
+

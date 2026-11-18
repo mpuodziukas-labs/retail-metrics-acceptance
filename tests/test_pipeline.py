@@ -1,5 +1,6 @@
 import csv
 import json
+from pathlib import Path
 
 from pipeline import run, selftest
 
@@ -91,3 +92,19 @@ def test_vendored_sample_checksum_matches_source_note():
     import hashlib
     sha = hashlib.sha256(run.CSV.read_bytes()).hexdigest()
     assert sha in (run.ROOT / "data" / "SOURCE.md").read_text()
+
+
+def test_selftest_fails_when_gate_misses_a_planted_fault(monkeypatch, capsys):
+    def blind_gate(argv):
+        Path(argv[argv.index("--out") + 1]).write_text("{}")
+        return 0
+    monkeypatch.setattr(run, "main", blind_gate)
+    assert selftest.main() == 1
+    assert "MISSED" in capsys.readouterr().out
+
+
+def test_selftest_fails_when_clean_control_goes_red(monkeypatch, capsys):
+    monkeypatch.setattr(run, "main", lambda argv: 1)
+    assert selftest.main() == 1
+    assert "stays green: NO" in capsys.readouterr().out
+
