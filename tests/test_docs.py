@@ -185,6 +185,28 @@ def test_regen_refuses_when_gate_is_red(tmp_path, monkeypatch):
     assert (tmp_path / "README.md").read_text() == readme
 
 
+def test_regen_done_message_names_every_rewritten_file(tmp_path, monkeypatch, capsys):
+    readme = (ROOT / "README.md").read_text()
+    stale = re.sub(r"(<!-- RESULTS:START -->\n).*?(\n<!-- RESULTS:END -->)",
+                   lambda mo: mo.group(1) + "stale" + mo.group(2), readme, flags=re.S)
+    _scratch_root(tmp_path, stale)
+    before = {p: (tmp_path / p).read_text() for p in
+              ("out/metrics.json", "dashboard/index.html", "docs/recommendation.md", "README.md")}
+    monkeypatch.setattr(regen, "ROOT", tmp_path)
+    assert regen.main() == 0
+    rewritten = [p for p, text in before.items() if (tmp_path / p).read_text() != text]
+    assert len(rewritten) == 4
+    assert capsys.readouterr().out == "regen done: " + ", ".join(rewritten) + "\n"
+
+
+def test_dashboard_escapes_html_in_values():
+    m = _metrics()
+    m["top_products"][0]["description"] = 'Tom & <u>"X"</u>'
+    html = render.dashboard(m)
+    assert "Tom &amp; &lt;u&gt;&quot;X&quot;&lt;/u&gt;" in html
+    assert "<u>" not in html and "Tom & " not in html
+
+
 def test_results_block_counts_only_passing_quality_checks():
     m = _metrics()
     m["quality"][0] = dict(m["quality"][0], ok=False)

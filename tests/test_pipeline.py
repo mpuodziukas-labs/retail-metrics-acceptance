@@ -44,6 +44,25 @@ def _write(rows, path):
         w.writerows(rows)
 
 
+def _null_key_check(tmp_path, price):
+    line = {"InvoiceNo": "N1", "StockCode": "", "Description": "x", "Quantity": "2",
+            "InvoiceDate": "2011-01-05 10:00:00", "UnitPrice": price,
+            "CustomerID": "c9", "Country": "France"}
+    _write([line], tmp_path / "n.csv")
+    conn = run.build_db(tmp_path / "n.csv")
+    return {c["name"]: c for c in run.run_quality(conn, run.load_baseline())}["null_join_key"]
+
+
+def test_null_key_line_with_zero_price_is_not_counted(tmp_path):
+    check = _null_key_check(tmp_path, "0.0")
+    assert check["observed"] == 0 and check["ok"]
+
+
+def test_null_key_line_with_a_price_is_counted(tmp_path):
+    check = _null_key_check(tmp_path, "3.5")
+    assert check["observed"] == 1 and not check["ok"]
+
+
 def test_negative_price_detected(tmp_path, rows):
     bad = [dict(r) for r in rows]
     bad[0]["UnitPrice"] = "-1.5"

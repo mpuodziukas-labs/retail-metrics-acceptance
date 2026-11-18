@@ -26,14 +26,31 @@ FIXTURE = [
 ]
 
 
-@pytest.fixture(scope="module")
-def tiny(tmp_path_factory):
-    path = tmp_path_factory.mktemp("tiny") / "tiny.csv"
+# c3: invoice-number order is the reverse of date order (B9 is first by date, last by number).
+REVERSED = [
+    ["B9", "S1", "Alpha", 1, "2011-04-01 10:00:00", 4.0, "c3", "France"],
+    ["B2", "S1", "Alpha", 2, "2011-04-02 10:00:00", 3.0, "c3", "France"],
+    ["B5", "S2", "Beta", 1, "2011-04-03 10:00:00", 10.0, "c3", "France"],
+]
+
+
+def _build(tmp_path_factory, name, fixture_rows):
+    path = tmp_path_factory.mktemp(name) / f"{name}.csv"
     with open(path, "w", newline="") as fh:
         w = csv.writer(fh)
         w.writerow(HEADER)
-        w.writerows(FIXTURE)
+        w.writerows(fixture_rows)
     return run.build_db(path)
+
+
+@pytest.fixture(scope="module")
+def tiny(tmp_path_factory):
+    return _build(tmp_path_factory, "tiny", FIXTURE)
+
+
+@pytest.fixture(scope="module")
+def reversed_numbers(tmp_path_factory):
+    return _build(tmp_path_factory, "reversed", REVERSED)
 
 
 def q(conn, sql):
@@ -66,6 +83,14 @@ def test_customer_windows_sequence_and_running_total(tiny):
     got = q(tiny, "SELECT InvoiceNo, order_seq, running_customer_revenue "
                   "FROM customer_order_windows WHERE CustomerID = 'c1' ORDER BY order_seq")
     assert got == [("A1", 1, 10.0), ("A2", 2, 15.0), ("A3", 3, 21.0)]
+
+
+def test_running_revenue_follows_date_not_invoice_number(reversed_numbers):
+    # By date: B9 = 1*4 = 4, then B2 = 2*3 = 6 (running 10), then B5 = 1*10 = 10 (running 20).
+    got = q(reversed_numbers,
+            "SELECT InvoiceNo, order_seq, running_customer_revenue "
+            "FROM customer_order_windows WHERE CustomerID = 'c3' ORDER BY InvoiceDate")
+    assert got == [("B9", 1, 4.0), ("B2", 2, 10.0), ("B5", 3, 20.0)]
 
 
 def test_top_products_tie_break_rank_and_units(tiny):
