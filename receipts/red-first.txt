@@ -1,0 +1,4 @@
+ImportError while loading conftest '.tmp/red2/tests/conftest.py'.
+tests/conftest.py:9: in <module>
+    from pipeline import run
+E   ImportError: cannot import name 'run' from 'pipeline' (.tmp/red2/pipeline/__init__.py)
