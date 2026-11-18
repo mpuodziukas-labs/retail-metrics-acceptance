@@ -20,3 +20,4 @@
 - fix: refuse overflowing totals and non-finite metrics by name; pin field-limit restore and .5 / 5. prices
 - test: pin that a non-overflow sqlite error reaches the caller unchanged
 - fix: make the 64-bit range check constant-time for any number; pin a 1e19 price
+- docs: test receipt shows the current 346 tests; red-first receipt says what it proves

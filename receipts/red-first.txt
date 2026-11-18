@@ -1,3 +1,5 @@
+RED 1, the test suite run against a scratch copy of the repo before pipeline/run.py existed.
+Every test fails at import, so no test could pass before the code was written:
 ImportError while loading conftest '.tmp/red2/tests/conftest.py'.
 tests/conftest.py:9: in <module>
     from pipeline import run
