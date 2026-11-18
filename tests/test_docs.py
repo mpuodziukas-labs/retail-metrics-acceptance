@@ -75,8 +75,13 @@ def test_runbook_sections_present():
 
 
 def _trace_rows():
-    return [l for l in (ROOT / "SPEC.md").read_text().splitlines()
-            if l.startswith("|") and l.rstrip().endswith(("PROVEN |", "GAP |"))]
+    rows = []
+    for l in (ROOT / "SPEC.md").read_text().splitlines():
+        if l.startswith("|") and l.rstrip().endswith("|"):
+            status = l.strip().strip("|").split("|")[-1].strip()
+            if status.startswith(("PROVEN", "PARTIAL", "GAP")):
+                rows.append((status.split()[0].rstrip(":"), l))
+    return rows
 
 
 def _sort_key(line):
@@ -85,22 +90,35 @@ def _sort_key(line):
     return (max(nums), sum(nums))
 
 
+def _of(status):
+    return [l for st, l in _trace_rows() if st == status]
+
+
 def test_trace_table_proven_rows_have_existing_tests():
-    rows = _trace_rows()
-    proven = [l for l in rows if l.rstrip().endswith("PROVEN |")]
-    gaps = [l for l in rows if l.rstrip().endswith("GAP |")]
-    assert len(proven) == 12 and len(gaps) == 5
-    assert rows == proven + gaps, "PROVEN rows must come first"
-    for l in proven:
+    assert (len(_of("PROVEN")), len(_of("PARTIAL")), len(_of("GAP"))) == (11, 1, 5)
+    order = [st for st, _ in _trace_rows()]
+    assert order == sorted(order, key=("PROVEN", "PARTIAL", "GAP").index), order
+    for l in _of("PROVEN") + _of("PARTIAL"):
         _assert_ids_exist(l)
-    for l in gaps:
+    for l in _of("GAP"):
         assert not TEST_ID.search(l)
 
 
+def test_trace_table_partial_row_states_its_limit():
+    (row,) = _of("PARTIAL")
+    assert row.startswith("| Communication |")
+    assert "written output, numbers tested; no live presentation" in row
+
+
 def test_trace_table_ordered_by_highest_count():
-    for group in ("PROVEN |", "GAP |"):
-        keys = [_sort_key(l) for l in _trace_rows() if l.rstrip().endswith(group)]
+    for status in ("PROVEN", "PARTIAL", "GAP"):
+        keys = [_sort_key(l) for l in _of(status)]
         assert keys == sorted(keys, reverse=True), keys
+
+
+def test_trace_table_dashboard_counts():
+    (row,) = [l for l in _of("PROVEN") if l.startswith("| Dashboards / reporting |")]
+    assert "data 10/10, business 6/10, operations 9/10" in row
 
 
 def test_no_em_dash_in_repo_files():
@@ -115,3 +133,23 @@ def test_regen_is_idempotent_on_disk():
     before = {p: (ROOT / p).read_bytes() for p in regen.OUTPUTS}
     regen.main()
     assert {p: (ROOT / p).read_bytes() for p in regen.OUTPUTS} == before
+
+
+def test_regen_overwrites_stale_outputs(tmp_path, monkeypatch):
+    """Start from stale generated files in a scratch root: regen must rewrite all four."""
+    for d in ("out", "dashboard", "docs"):
+        (tmp_path / d).mkdir()
+    for p in ("out/metrics.json", "dashboard/index.html", "docs/recommendation.md"):
+        (tmp_path / p).write_text("stale")
+    readme = (ROOT / "README.md").read_text()
+    stale = re.sub(r"(<!-- RESULTS:START -->\n).*?(\n<!-- RESULTS:END -->)",
+                   lambda mo: mo.group(1) + "stale" + mo.group(2), readme, flags=re.S)
+    assert stale != readme
+    (tmp_path / "README.md").write_text(stale)
+    monkeypatch.setattr(regen, "ROOT", tmp_path)
+    assert regen.main() == 0
+    m = _metrics()
+    assert (tmp_path / "out/metrics.json").read_text() == run.dump(m)
+    assert (tmp_path / "dashboard/index.html").read_text() == render.dashboard(m)
+    assert (tmp_path / "docs/recommendation.md").read_text() == render.recommendation(m)
+    assert (tmp_path / "README.md").read_text() == readme

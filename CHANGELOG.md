@@ -6,3 +6,4 @@
 - feat: add renderers, regen, dashboard, docs, CI and generated outputs
 - docs: add run receipts
 - docs: redraw trace table counts and add requirement rows
+- test: add view fixture tests, regen overwrite test, partial status for Communication

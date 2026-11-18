@@ -24,10 +24,9 @@ Counts are out of 10 US-remote postings per title (Data Analyst, Business Analys
 
 | Requirement | Seen in N/10 postings | File | Test id | Status |
 |-------------|-----------------------|------|---------|--------|
-| Dashboards / reporting | data 10/10, business 7/10, operations 10/10 | `dashboard/index.html` | `tests/test_acceptance.py::test_us8_dashboard_numbers_match_metrics` | PROVEN |
+| Dashboards / reporting | data 10/10, business 6/10, operations 9/10 | `dashboard/index.html` | `tests/test_acceptance.py::test_us8_dashboard_numbers_match_metrics` | PROVEN |
 | Stakeholder requirements / cross-functional | data 8/10, business 10/10, operations 7/10 | `docs/requirements.md` | `tests/test_docs.py::test_every_story_names_an_existing_test` | PROVEN |
 | SQL | data 10/10, business 3/10, operations 4/10 | `sql/05_monthly_revenue.sql` ... `sql/09_headline_metrics.sql` | `tests/test_acceptance.py::test_us1_monthly_revenue_matches_independent_sum` | PROVEN |
-| Communication | data 7/10, business 9/10, operations 9/10 | `docs/recommendation.md` | `tests/test_docs.py::test_recommendation_matches_regen` | PROVEN |
 | Recommendations / insights | data 8/10, business 7/10, operations 4/10 | `docs/recommendation.md` | `tests/test_docs.py::test_recommendation_matches_regen` | PROVEN |
 | Python | data 8/10, business 1/10, operations 2/10 | `pipeline/run.py` | `tests/test_pipeline.py::test_main_green_writes_metrics` | PROVEN |
 | Process improvement / mapping | data 4/10, business 7/10, operations 7/10 | `docs/requirements.md` (Mermaid process map) | `tests/test_docs.py::test_process_map_present` | PROVEN |
@@ -36,6 +35,7 @@ Counts are out of 10 US-remote postings per title (Data Analyst, Business Analys
 | KPIs and metrics | data 5/10, business 1/10, operations 2/10 | `sql/09_headline_metrics.sql` | `tests/test_acceptance.py::test_us6_average_order_value` | PROVEN |
 | ETL / pipelines | data 5/10, business 0/10, operations 1/10 | `pipeline/run.py` | `tests/test_pipeline.py::test_load_row_count_equals_csv` | PROVEN |
 | Data quality | data 1/10, business 2/10, operations 3/10 | `pipeline/run.py` quality checks | `tests/test_pipeline.py::test_mutant_disabled_quality_check_lets_fault_through` | PROVEN |
+| Communication | data 7/10, business 9/10, operations 9/10 | `docs/recommendation.md` | `tests/test_docs.py::test_recommendation_matches_regen` | PARTIAL: written output, numbers tested; no live presentation |
 | Agile ticketing | data 1/10, business 6/10, operations 0/10 | none | none | GAP |
 | Spreadsheets | data 2/10, business 2/10, operations 4/10 | none | none | GAP |
 | A BI tool | data 4/10, business 2/10, operations 0/10 | none | none | GAP |
