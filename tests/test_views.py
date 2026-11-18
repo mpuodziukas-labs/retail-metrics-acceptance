@@ -333,3 +333,64 @@ def test_top_products_rank_counts_tied_products_one_by_one(tied_countries):
     first = [t for t in tied_countries if t["country"] == "Alp"]
     assert [(t["rank"], t["stock_code"]) for t in first] == [(1, "S1"), (2, "S2")]
 
+
+@pytest.mark.parametrize("descs", [("", "Alpha"), ("Alpha", "")])
+def test_dim_products_prefers_a_description_over_a_missing_one(tmp_path_factory, descs):
+    db = _build(tmp_path_factory, "descnull", [
+        _row(f"D{i}", "S1", d, 1, "2011-01-05 10:00:00", 2.0, "c1", "France")
+        for i, d in enumerate(descs)])
+    assert q(db, "SELECT StockCode, canonical_description FROM dim_products") == [("S1", "Alpha")]
+
+
+def test_clean_orders_drops_zero_quantity_lines(tmp_path_factory):
+    db = _build(tmp_path_factory, "zeroqty", [
+        _row("Z1", "S1", "Alpha", 0, "2011-06-01 10:00:00", 5.0, "c1", "France"),
+        _row("Z2", "S1", "Alpha", 1, "2011-06-02 10:00:00", 5.0, "c1", "France")])
+    assert q(db, "SELECT InvoiceNo FROM clean_orders") == [("Z2",)]
+
+
+def test_invoice_number_that_is_only_the_letter_c_is_a_cancellation_flag(tmp_path_factory):
+    db = _build(tmp_path_factory, "barec", [
+        _row("C", "S1", "Alpha", 1, "2011-06-01 10:00:00", 5.0, "c1", "France")])
+    assert q(db, "SELECT InvoiceNo, is_cancellation FROM clean_orders") == [("C", 1)]
+
+
+@pytest.mark.parametrize("view", ["monthly_cancellation", "headline_metrics"])
+def test_invoice_number_that_is_only_the_letter_c_counts_as_cancelled(tmp_path_factory, view):
+    db = _build(tmp_path_factory, "barecrate", [
+        _row("C", "S1", "Alpha", 1, "2011-06-01 10:00:00", 5.0, "c1", "France"),
+        _row("A1", "S1", "Alpha", 1, "2011-06-02 10:00:00", 5.0, "c1", "France")])
+    got = q(db, f"SELECT invoices, cancelled_invoices, cancellation_rate_pct FROM {view}")
+    assert got == [(2, 1, 50.0)]
+
+
+def test_order_seq_restarts_for_each_customer(tiny):
+    got = q(tiny, "SELECT CustomerID, InvoiceNo, order_seq FROM customer_order_windows "
+                  "ORDER BY CustomerID, InvoiceDate")
+    assert got == [("c1", "A1", 1), ("c1", "A2", 2), ("c1", "A3", 3),
+                   ("c2", "C1", 1), ("c2", "A4", 2)]
+
+
+def test_customer_windows_line_revenue_is_quantity_times_price(tiny):
+    # c1: 2 * 5.0, 1 * 5.0, 3 * 2.0; c2: 1 * 5.0, 1 * 2.0.
+    got = q(tiny, "SELECT CustomerID, InvoiceNo, line_revenue FROM customer_order_windows "
+                  "ORDER BY CustomerID, InvoiceDate")
+    assert got == [("c1", "A1", 10.0), ("c1", "A2", 5.0), ("c1", "A3", 6.0),
+                   ("c2", "C1", 5.0), ("c2", "A4", 2.0)]
+
+
+def test_top_products_revenue_is_rounded_to_two_places(tmp_path_factory):
+    # 3 * 0.1111 = 0.3333: two places gives 0.33.
+    db = _build(tmp_path_factory, "prodround", [
+        _row("R1", "S1", "Alpha", 3, "2011-06-01 10:00:00", 0.1111, "c1", "France")])
+    assert q(db, "SELECT stock_code, revenue FROM product_country_revenue") == [("S1", 0.33)]
+
+
+def test_monthly_prev_revenue_is_rounded_to_two_places(tmp_path_factory):
+    # 3 * 0.1111 is 0.33330000000000004 as a float; the previous-month column shows 0.33.
+    db = _build(tmp_path_factory, "prevround", [
+        _row("R1", "S1", "Alpha", 3, "2011-06-01 10:00:00", 0.1111, "c1", "France"),
+        _row("R2", "S1", "Alpha", 1, "2011-07-01 10:00:00", 1.0, "c1", "France")])
+    got = q(db, "SELECT month, revenue, prev_revenue FROM monthly_revenue ORDER BY month")
+    assert got == [("2011-06", 0.33, None), ("2011-07", 1.0, 0.33)]
+
