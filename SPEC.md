@@ -77,6 +77,9 @@ Each check is compared with `data/quality_baseline.json`, the count the vendored
 - Derived SQL names are snake_case; raw columns keep source names.
 - River alignment of keywords is not adopted; uppercase keywords and snake_case names are.
 - No hand-typed numbers in README or `docs/recommendation.md`: `make regen` writes them from `out/metrics.json`.
+- Every file read or written by `pipeline/` names `encoding="utf-8"`, so the outputs do not depend on the locale (`tests/test_entrypoints.py::test_run_script_output_is_identical_under_the_strictest_c_locale`, `tests/test_pipeline.py::test_every_text_io_call_in_pipeline_names_its_encoding`).
+- `pipeline/run.py` refuses a file with no clean order lines (all cancelled, zero price only, header only): it prints `no clean order lines; nothing to report`, exits 1 and writes nothing (`tests/test_entrypoints.py::test_scripts_refuse_a_file_with_no_clean_order_lines`).
+- The loader fails with one `ValueError` naming the row and column for a blank or non-integer Quantity, a blank, non-numeric or non-finite UnitPrice, and an InvoiceDate that is not `YYYY-MM-DD HH:MM:SS`; a file that is not UTF-8 names the line. The committed sample has none of these (`tests/test_pipeline.py::test_loader_names_the_row_and_column_of_a_bad_cell`).
 
 ## Standards table
 

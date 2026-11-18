@@ -394,3 +394,36 @@ def test_monthly_prev_revenue_is_rounded_to_two_places(tmp_path_factory):
     got = q(db, "SELECT month, revenue, prev_revenue FROM monthly_revenue ORDER BY month")
     assert got == [("2011-06", 0.33, None), ("2011-07", 1.0, 0.33)]
 
+
+def test_raw_columns_are_stored_as_integer_quantity_and_real_price(tiny):
+    # Prices such as 5.0 must stay real, and quantities must not become text.
+    assert q(tiny, "SELECT DISTINCT typeof(Quantity), typeof(UnitPrice) FROM raw_orders") == [
+        ("integer", "real")]
+
+
+def test_month_without_cancellations_still_appears_with_a_zero_rate(tmp_path_factory):
+    db = _build(tmp_path_factory, "nocancel", [
+        _row("A1", "S1", "Alpha", 1, "2011-06-01 10:00:00", 5.0, "c1", "France"),
+        _row("A2", "S1", "Alpha", 1, "2011-07-01 10:00:00", 5.0, "c1", "France"),
+        _row("C3", "S1", "Alpha", -1, "2011-07-02 10:00:00", 5.0, "c1", "France")])
+    got = [(r["month"], r["cancellation_rate_pct"]) for r in _metrics_of(db)["monthly"]]
+    assert got == [("2011-06", 0.0), ("2011-07", 50.0)]
+
+
+def test_peak_month_tie_goes_to_the_earlier_month(tmp_path_factory):
+    from pipeline import render
+    db = _build(tmp_path_factory, "peaktie", [
+        _row("P1", "S1", "Alpha", 1, "2011-06-01 10:00:00", 5.0, "c1", "France"),
+        _row("P2", "S1", "Alpha", 1, "2011-07-01 10:00:00", 5.0, "c1", "France")])
+    m = _metrics_of(db)
+    assert "| Peak revenue month | 2011-06 (5.00) |" in render.results_block(m)
+    assert "2011-06 is the highest revenue month" in render.recommendation(m)
+
+
+def test_dashboard_tile_label_is_html_escaped(tiny, monkeypatch):
+    from pipeline import render
+    monkeypatch.setattr(render, "TILES", [("Net <b> & gross", "revenue_total", "money")])
+    html = render.dashboard(_metrics_of(tiny))
+    assert '<span class="k">Net &lt;b&gt; &amp; gross</span>' in html
+    assert "Net <b>" not in html
+

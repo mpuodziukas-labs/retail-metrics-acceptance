@@ -1,9 +1,13 @@
 """Load the CSV into sqlite, apply the SQL views, run the quality gate, emit metrics."""
 import argparse
 import csv
+import io
 import json
+import math
+import re
 import sqlite3
 import sys
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -27,23 +31,64 @@ CHECKS = [
 ]
 
 
+DATE_FORMAT = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
+
+
+def _int(raw):
+    return int(raw)
+
+
+def _price(raw):
+    value = float(raw)
+    if not math.isfinite(value):
+        raise ValueError(raw)
+    return value
+
+
+def _date(raw):
+    if not DATE_FORMAT.fullmatch(raw):
+        raise ValueError(raw)
+    datetime.strptime(raw, "%Y-%m-%d %H:%M:%S")
+    return raw
+
+
+def _cell(row_no, column, raw, parse):
+    try:
+        return parse(raw)
+    except ValueError:
+        raise ValueError(f"row {row_no}, column {column}: {raw!r} is not a valid value") from None
+
+
+def _read_rows(csv_path):
+    data = Path(csv_path).read_bytes()
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as err:
+        line = data[:err.start].count(b"\n") + 1
+        raise ValueError(f"{csv_path}: not valid UTF-8 at line {line}") from None
+    rows = []
+    for row_no, r in enumerate(csv.DictReader(io.StringIO(text, newline="")), start=2):
+        rows.append((r["InvoiceNo"], r["StockCode"] or None, r["Description"] or None,
+                     _cell(row_no, "Quantity", r["Quantity"], _int),
+                     _cell(row_no, "InvoiceDate", r["InvoiceDate"], _date),
+                     _cell(row_no, "UnitPrice", r["UnitPrice"], _price),
+                     r["CustomerID"] or None, r["Country"]))
+    return rows
+
+
 def build_db(csv_path):
     conn = sqlite3.connect(":memory:")
     conn.execute(
         "CREATE TABLE raw_orders (InvoiceNo TEXT, StockCode TEXT, Description TEXT, "
         "Quantity INTEGER, InvoiceDate TEXT, UnitPrice REAL, CustomerID TEXT, Country TEXT)")
-    with open(csv_path, newline="") as fh:
-        rows = [(r["InvoiceNo"], r["StockCode"] or None, r["Description"] or None,
-                 int(r["Quantity"]), r["InvoiceDate"], float(r["UnitPrice"]),
-                 r["CustomerID"] or None, r["Country"]) for r in csv.DictReader(fh)]
-    conn.executemany("INSERT INTO raw_orders VALUES (?,?,?,?,?,?,?,?)", rows)
+    conn.executemany("INSERT INTO raw_orders VALUES (?,?,?,?,?,?,?,?)", _read_rows(csv_path))
     for f in sorted(SQL_DIR.glob("*.sql")):
-        conn.executescript(f.read_text())
+        conn.executescript(f.read_text(encoding="utf-8"))
     return conn
 
 
 def load_baseline():
-    return json.loads(BASELINE.read_text())
+    return json.loads(BASELINE.read_text(encoding="utf-8"))
 
 
 def run_quality(conn, baseline):
@@ -102,9 +147,12 @@ def main(argv=None):
     if not all(c["ok"] for c in checks):
         print("GATE RED: no metrics written")
         return 1
+    if not conn.execute("SELECT COUNT(*) FROM clean_orders").fetchone()[0]:
+        print("no clean order lines; nothing to report")
+        return 1
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(dump(compute_metrics(conn, checks)))
+    out.write_text(dump(compute_metrics(conn, checks)), encoding="utf-8")
     print(f"GATE GREEN: wrote {out.name}")
     return 0
 

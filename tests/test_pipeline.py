@@ -243,3 +243,90 @@ def test_plant_null_key_skips_zero_price_lines(tmp_path):
     with open(dst, newline="") as fh:
         got = {r["InvoiceNo"]: r["StockCode"] for r in csv.DictReader(fh)}
     assert got == {"Z1": "S1", "K1": ""}
+
+
+def _bad_cell(tmp_path, column, value):
+    """Two good lines, then one line whose cell is bad: spreadsheet row 4 (header is row 1)."""
+    path = tmp_path / "bad.csv"
+    _write([_line(InvoiceNo="A1"), _line(InvoiceNo="A2"), _line(**{column: value})], path)
+    with pytest.raises(ValueError) as caught:
+        run.build_db(path)
+    assert type(caught.value) is ValueError
+    return str(caught.value)
+
+
+@pytest.mark.parametrize("column,value", [
+    ("Quantity", ""), ("Quantity", "1.5"), ("Quantity", "2.0"), ("Quantity", "abc"),
+    ("UnitPrice", ""), ("UnitPrice", "abc"), ("UnitPrice", "nan"), ("UnitPrice", "inf"),
+    ("InvoiceDate", ""), ("InvoiceDate", "2011-1-5 10:00:00"), ("InvoiceDate", "2011-01-05"),
+    ("InvoiceDate", "2011-13-05 10:00:00"), ("InvoiceDate", "2011-01-05T10:00:00")])
+def test_loader_names_the_row_and_column_of_a_bad_cell(tmp_path, column, value):
+    msg = _bad_cell(tmp_path, column, value)
+    assert msg.startswith(f"row 4, column {column}: ") and repr(value) in msg
+
+
+def test_loader_names_the_line_of_a_file_that_is_not_utf_8(tmp_path):
+    path = tmp_path / "latin.csv"
+    _write([_line(InvoiceNo="A1"), _line(InvoiceNo="A2", Description="y")], path)
+    raw = path.read_bytes().replace(b",y,", b",caf\xe9,")
+    path.write_bytes(raw)
+    with pytest.raises(ValueError) as caught:
+        run.build_db(path)
+    assert type(caught.value) is ValueError
+    assert "not valid UTF-8" in str(caught.value) and "line 3" in str(caught.value)
+
+
+def test_orphan_rows_check_alone_turns_the_gate_red(tmp_path, monkeypatch, capsys):
+    # The null-key line is allowed through its own check, so only orphan_rows can stop the run.
+    baseline = tmp_path / "baseline.json"
+    allowed = dict(run.load_baseline(), null_join_key=1)
+    baseline.write_text(json.dumps(allowed))
+    monkeypatch.setattr(run, "BASELINE", baseline)
+    bad, out = tmp_path / "null.csv", tmp_path / "m.json"
+    selftest.plant_null_key(run.CSV, bad)
+    assert run.main(["--csv", str(bad), "--out", str(out)]) == 1
+    assert "RED orphan_rows (integrity): observed 1, allowed 0" in capsys.readouterr().out
+    assert not out.exists()
+
+
+def test_selftest_counts_any_exit_other_than_one_as_missed(monkeypatch, capsys):
+    _stub_run(monkeypatch, (2, 2))
+    assert selftest.main() == 1
+    assert capsys.readouterr().out.count("MISSED") == 2
+
+
+def test_selftest_control_run_must_exit_zero_not_just_non_one(monkeypatch, capsys):
+    def fake(argv):
+        return 2 if argv[argv.index("--csv") + 1] == str(run.CSV) else 1
+    monkeypatch.setattr(run, "main", fake)
+    assert selftest.main() == 1
+    out = capsys.readouterr().out
+    assert "clean sample stays green: NO" in out and out.endswith("SELFTEST FAIL\n")
+
+
+def test_plant_duplicate_copies_a_sold_line_not_a_return(tmp_path):
+    src, dst = tmp_path / "s.csv", tmp_path / "d.csv"
+    _write([_line(InvoiceNo="C1", Quantity="-3"), _line(InvoiceNo="S1", Quantity="2")], src)
+    selftest.plant_duplicate(src, dst)
+    with open(dst, newline="") as fh:
+        got = [(r["InvoiceNo"], r["Quantity"]) for r in csv.DictReader(fh)]
+    assert got == [("C1", "-3"), ("S1", "2"), ("S1", "2")]
+
+
+def test_every_text_io_call_in_pipeline_names_its_encoding():
+    import ast
+    root = Path(run.__file__).resolve().parent
+    seen = 0
+    for path in sorted(root.glob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if not isinstance(node, ast.Call):
+                continue
+            fn = node.func
+            name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+            if name in ("read_text", "write_text") or (name == "open" and not (
+                    len(node.args) > 1 and isinstance(node.args[1], ast.Constant)
+                    and "b" in str(node.args[1].value))):
+                seen += 1
+                assert any(k.arg == "encoding" for k in node.keywords), (
+                    f"{path.name}:{node.lineno} {name}() has no encoding")
+    assert seen >= 7

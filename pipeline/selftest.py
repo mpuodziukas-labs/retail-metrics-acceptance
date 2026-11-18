@@ -9,13 +9,13 @@ from pipeline import run  # noqa: E402
 
 
 def _read(src):
-    with open(src, newline="") as fh:
+    with open(src, newline="", encoding="utf-8") as fh:
         r = csv.DictReader(fh)
         return r.fieldnames, list(r)
 
 
 def _write(fields, rows, dst):
-    with open(dst, "w", newline="") as fh:
+    with open(dst, "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=fields)
         w.writeheader()
         w.writerows(rows)
